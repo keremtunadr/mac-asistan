@@ -45,6 +45,7 @@ enum LKey: String {
     case errorPrefix, refusal, emptyAnswer, voiceMessage
     case emptyChatTitle, emptyChatText
     case untitledChat
+    case testKey, testOK, keyFormatWarning, hintInvalidKey, hintModelNotFound, hintBilling
 }
 
 enum L10n {
@@ -161,5 +162,19 @@ enum L10n {
                          "Schreib oder tippe aufs Mikrofon. Du kannst Türkisch, Deutsch oder Englisch sprechen.",
                          "Type or tap the microphone. You can speak Turkish, German or English."),
         .untitledChat: ("Yeni sohbet", "Neuer Chat", "New chat"),
+        .testKey: ("Test et", "Testen", "Test"),
+        .testOK: ("Anahtar çalışıyor ✓", "Schlüssel funktioniert ✓", "Key works ✓"),
+        .keyFormatWarning: ("Bu bir %@ anahtarına benzemiyor. Gerçek anahtar \"%@\" ile başlar. Anahtarın kimliğini (ID) değil, oluşturulurken bir kez gösterilen anahtarın tamamını kopyala.",
+                            "Das sieht nicht wie ein %@-Schlüssel aus. Echte Schlüssel beginnen mit \"%@\". Kopiere den vollständigen Schlüssel, der beim Erstellen einmal angezeigt wird – nicht die ID.",
+                            "This doesn't look like a %@ key. Real keys start with \"%@\". Copy the full key shown once when it's created – not the key ID."),
+        .hintInvalidKey: ("İpucu: Anahtar geçersiz. Ayarlar › Yapay Zekâ'da anahtarı sil, sağlayıcının sitesinde yeni bir anahtar oluştur ve tamamını yapıştır. Ardından \"Test et\" düğmesiyle dene.",
+                          "Tipp: Der Schlüssel ist ungültig. Lösche ihn unter Einstellungen › KI, erstelle beim Anbieter einen neuen und füge ihn vollständig ein. Prüfe ihn dann mit \"Testen\".",
+                          "Tip: The key is invalid. Delete it in Settings › AI, create a new key on the provider's site and paste it completely. Then check it with \"Test\"."),
+        .hintModelNotFound: ("İpucu: Bu model kullanılamıyor. Ayarlar › Yapay Zekâ'da \"Modelleri yükle\" düğmesine bas ve listeden güncel bir model seç.",
+                             "Tipp: Dieses Modell ist nicht verfügbar. Klicke unter Einstellungen › KI auf \"Modelle laden\" und wähle ein aktuelles Modell.",
+                             "Tip: This model isn't available. In Settings › AI click \"Load models\" and pick a current model."),
+        .hintBilling: ("İpucu: Hesabında kredi/kota kalmamış olabilir. Sağlayıcının sitesinde Billing (ödeme) bölümünü kontrol et.",
+                       "Tipp: Möglicherweise ist dein Guthaben/Kontingent aufgebraucht. Prüfe den Bereich Billing beim Anbieter.",
+                       "Tip: Your credit or quota may be used up. Check the Billing section on the provider's site."),
     ]
 }

@@ -82,6 +82,10 @@ final class AppSettings: ObservableObject {
         hotkeyEnabled = defaults.object(forKey: "hotkeyEnabled") as? Bool ?? true
         silenceSeconds = defaults.object(forKey: "silenceSeconds") as? Double ?? 1.5
         hasCompletedOnboarding = defaults.bool(forKey: "hasCompletedOnboarding")
+
+        for kind in AIProviderKind.allCases where kind.retiredDefaults.contains(model(for: kind)) {
+            setModel(kind.defaultModel, for: kind)
+        }
     }
 
     func model(for kind: AIProviderKind) -> String {

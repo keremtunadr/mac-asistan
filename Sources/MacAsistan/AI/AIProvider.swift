@@ -17,7 +17,7 @@ enum AIProviderKind: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .anthropic: return "claude-opus-5-5"
         case .openai: return "gpt-5"
-        case .gemini: return "gemini-2.5-flash"
+        case .gemini: return "gemini-3.8-flash"
         }
     }
 
@@ -26,7 +26,24 @@ enum AIProviderKind: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .anthropic: return ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"]
         case .openai: return ["gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4o"]
-        case .gemini: return ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+        case .gemini: return ["gemini-3.8-flash"]
+        }
+    }
+
+    /// Gerçek anahtarların başladığı ön ek (yanlış metin yapıştırılmasını fark etmek için).
+    var keyPrefix: String {
+        switch self {
+        case .anthropic: return "sk-ant-"
+        case .openai: return "sk-"
+        case .gemini: return "AIza"
+        }
+    }
+
+    /// Artık kullanılamayan eski varsayılan modeller → yenisiyle değiştirilir.
+    var retiredDefaults: Set<String> {
+        switch self {
+        case .gemini: return ["gemini-2.5-flash"]
+        default: return []
         }
     }
 

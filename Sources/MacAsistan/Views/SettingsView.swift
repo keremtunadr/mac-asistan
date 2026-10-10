@@ -136,6 +136,9 @@ private struct APIKeyRow: View {
     let kind: AIProviderKind
     @State private var input = ""
     @State private var error: String?
+    @State private var warning: String?
+    @State private var testResult: (ok: Bool, text: String)?
+    @State private var testing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -155,26 +158,56 @@ private struct APIKeyRow: View {
                 }
             }
             HStack {
-                if app.apiKeys[kind] != nil {
+                if let masked = app.maskedKey(for: kind) {
                     Text(L10n.t(.keyStored)).foregroundStyle(.green)
+                    Text(masked).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                    Button(L10n.t(.testKey)) { Task { await test() } }
+                        .controlSize(.small)
+                        .disabled(testing)
+                    if testing { ProgressView().controlSize(.small) }
                 } else {
                     Text(L10n.t(.keyMissing)).foregroundStyle(.secondary)
                 }
                 Link(kind.keyHelpURL.host ?? "", destination: kind.keyHelpURL)
-                if let error { Text(error).foregroundStyle(.red) }
             }
             .font(.caption)
+            if let warning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(.orange)
+            }
+            if let testResult {
+                Text(testResult.text).font(.caption).foregroundStyle(testResult.ok ? .green : .red)
+            }
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
         }
     }
 
     private func save() {
         do {
-            try app.saveKey(input, for: kind)
+            let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+            try app.saveKey(trimmed, for: kind)
             input = ""
             error = nil
+            testResult = nil
+            warning = trimmed.hasPrefix(kind.keyPrefix) ? nil : formatWarning
+            Task { await test() }
             if app.apiKeys[app.settings.provider] == nil { app.settings.provider = kind }
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    private var formatWarning: String {
+        String(format: L10n.t(.keyFormatWarning), kind.displayName, kind.keyPrefix)
+    }
+
+    private func test() async {
+        testing = true
+        defer { testing = false }
+        switch await app.testKey(for: kind) {
+        case .success:
+            testResult = (true, L10n.t(.testOK))
+        case let .failure(failure):
+            testResult = (false, "\(L10n.t(.errorPrefix)): \(failure.localizedDescription)")
         }
     }
 }

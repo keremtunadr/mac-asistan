@@ -167,6 +167,22 @@ final class AppState: ObservableObject {
         settings.hasCompletedOnboarding = true
     }
 
+    /// Ayarlarda göstermek için: "sk-ant-…KrJM"
+    func maskedKey(for kind: AIProviderKind) -> String? {
+        guard let key = apiKeys[kind] else { return nil }
+        guard key.count > 12 else { return String(repeating: "•", count: key.count) }
+        return "\(key.prefix(7))…\(key.suffix(4))"
+    }
+
+    /// Anahtarı sağlayıcıya küçük bir istekle dener (model listesini çeker).
+    func testKey(for kind: AIProviderKind) async -> Result<Int, Error> {
+        do {
+            return .success(try await listModels(for: kind).count)
+        } catch {
+            return .failure(error)
+        }
+    }
+
     func deleteKey(for kind: AIProviderKind) {
         Keychain.delete(account: kind.keychainAccount)
         apiKeys[kind] = nil
@@ -216,6 +232,12 @@ final class AppState: ObservableObject {
         switch error {
         case AIError.refusal: return L10n.t(.refusal)
         case AIError.empty: return L10n.t(.emptyAnswer)
+        case AIError.http(401, _), AIError.http(403, _):
+            return "\(L10n.t(.errorPrefix)): \(error.localizedDescription)\n\n\(L10n.t(.hintInvalidKey))"
+        case AIError.http(404, _):
+            return "\(L10n.t(.errorPrefix)): \(error.localizedDescription)\n\n\(L10n.t(.hintModelNotFound))"
+        case AIError.http(402, _), AIError.http(429, _):
+            return "\(L10n.t(.errorPrefix)): \(error.localizedDescription)\n\n\(L10n.t(.hintBilling))"
         default: return "\(L10n.t(.errorPrefix)): \(error.localizedDescription)"
         }
     }
