@@ -32,10 +32,27 @@ final class AppState: ObservableObject {
     private var didStart = false
 
     private init() {
-        for kind in AIProviderKind.allCases {
-            if let key = Keychain.get(account: kind.keychainAccount) { apiKeys[kind] = key }
-        }
+        reloadKeys()
         wire()
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in AppState.shared.reloadKeys() }
+        }
+    }
+
+    /// Anahtarları Keychain'den yeniden okur (başka bir pencerede/oturumda kaydedilmiş olabilir).
+    func reloadKeys() {
+        var keys: [AIProviderKind: String] = [:]
+        for kind in AIProviderKind.allCases {
+            if let key = Keychain.get(account: kind.keychainAccount) { keys[kind] = key }
+        }
+        if keys != apiKeys { apiKeys = keys }
+    }
+
+    /// Bellekte yoksa Keychain'e bir kez daha bakar.
+    private func key(for kind: AIProviderKind) -> String? {
+        if let key = apiKeys[kind] { return key }
+        reloadKeys()
+        return apiKeys[kind]
     }
 
     var hasKeyForCurrentProvider: Bool { apiKeys[settings.provider] != nil }
@@ -156,7 +173,7 @@ final class AppState: ObservableObject {
     }
 
     func listModels(for kind: AIProviderKind) async throws -> [String] {
-        guard let key = apiKeys[kind] else { throw AIError.http(401, L10n.t(.keyNotSet)) }
+        guard let key = key(for: kind) else { throw AIError.http(401, L10n.t(.keyNotSet)) }
         return try await kind.makeClient().listModels(apiKey: key)
     }
 
@@ -171,7 +188,7 @@ final class AppState: ObservableObject {
 
         let provider = settings.provider
         let model = settings.model(for: provider)
-        guard let key = apiKeys[provider] else {
+        guard let key = key(for: provider) else {
             store.append(ChatMessage(role: .assistant, text: "\(L10n.t(.noApiKey)): \(provider.displayName). \(L10n.t(.noApiKeyHint))", isError: true), to: conversationID)
             openWindow("settings")
             return

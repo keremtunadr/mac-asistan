@@ -39,6 +39,7 @@ struct ChatView: View {
         }
         .onAppear {
             if app.openWindowAction == nil { app.openWindowAction = openWindow }
+            app.reloadKeys()
         }
     }
 
