@@ -65,15 +65,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Uygulama zaten çalışıyorsa: o kopyaya pencereyi göstermesini söyle ve bu kopyayı kapat.
+        // Başka bir kopya (ör. eski sürüm) çalışıyorsa onu kapat: her zaman en son açılan kopya kazanır.
         if let bundleID = Bundle.main.bundleIdentifier {
             let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                 .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }
-            if let existing = others.first {
-                DistributedNotificationCenter.default().postNotificationName(Self.showNotification, object: nil, userInfo: nil, deliverImmediately: true)
-                existing.activate()
-                NSApp.terminate(nil)
-                return
+            for other in others {
+                other.terminate()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    if !other.isTerminated { other.forceTerminate() }
+                }
             }
         }
 
