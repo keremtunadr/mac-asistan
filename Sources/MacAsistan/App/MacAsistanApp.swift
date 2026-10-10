@@ -23,6 +23,18 @@ struct MacAsistanApp: App {
         }
         .menuBarExtraStyle(.window)
 
+        Window("Wissensdatenbank", id: "library") {
+            LibraryView()
+                .environmentObject(app)
+        }
+        .defaultSize(width: 900, height: 600)
+
+        WindowGroup("Quelle", id: "source", for: SourceTarget.self) { $target in
+            SourceViewer(target: target)
+                .environmentObject(app)
+        }
+        .defaultSize(width: 760, height: 900)
+
         Window("Mac Asistan – Ayarlar", id: "settings") {
             SettingsView()
                 .environmentObject(app)

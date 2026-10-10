@@ -13,6 +13,17 @@ struct ChatView: View {
                 if !app.hasKeyForCurrentProvider {
                     MissingKeyBanner { show("settings") }
                 }
+                if app.settings.evidenceMode {
+                    HStack {
+                        Image(systemName: "books.vertical.fill").foregroundStyle(.tint)
+                        Text(String(format: L10n.t(.evidenceBanner), app.knowledge.readyDocuments.count))
+                            .font(.callout)
+                        Spacer()
+                        Button(L10n.t(.library)) { show("library") }
+                    }
+                    .padding(8)
+                    .background(Color.accentColor.opacity(0.1))
+                }
                 MessagesView()
                 Divider()
                 InputBar()
@@ -29,6 +40,13 @@ struct ChatView: View {
                     }
                 }
                 .help(L10n.t(.provider))
+            }
+            ToolbarItem {
+                Toggle(isOn: Binding(get: { app.settings.evidenceMode }, set: { app.settings.evidenceMode = $0 })) {
+                    Label(L10n.t(.evidenceMode), systemImage: "books.vertical")
+                }
+                .toggleStyle(.button)
+                .help(L10n.t(.evidenceModeHint))
             }
             ToolbarItem {
                 Button {
@@ -121,7 +139,7 @@ private struct MessagesView: View {
                     if app.isSending && messages.last?.role != .assistant {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text(L10n.t(.thinking)).foregroundStyle(.secondary)
+                            Text(app.statusText ?? L10n.t(.thinking)).foregroundStyle(.secondary)
                         }
                         .id("thinking")
                     }
@@ -163,12 +181,17 @@ private struct MessageBubble: View {
         HStack(alignment: .top) {
             if isUser { Spacer(minLength: 60) }
             VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
-                Text(attributed)
-                    .textSelection(.enabled)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .foregroundStyle(isUser ? Color.white : Color.primary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(attributed)
+                        .textSelection(.enabled)
+                    if let sources = message.sources, !sources.isEmpty {
+                        SourcesList(sources: sources)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .foregroundStyle(isUser ? Color.white : Color.primary)
                 HStack(spacing: 4) {
                     if message.viaVoice {
                         Image(systemName: "mic.fill")
@@ -287,5 +310,63 @@ private struct InputBar: View {
         text = ""
         app.stopSpeaking()
         Task { await app.send(message) }
+    }
+}
+
+// MARK: - Kaynak listesi (uygulama tarafından oluşturulur ve doğrulanır)
+
+private struct SourcesList: View {
+    @Environment(\.openWindow) private var openWindow
+    let sources: [CitedSource]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+            Text(L10n.t(.sources)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            ForEach(sources) { source in
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("[\(source.number)]").font(.caption.monospacedDigit().weight(.semibold))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(source.citation).font(.caption)
+                            if !source.locationText.isEmpty {
+                                Text(source.locationText).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer(minLength: 4)
+                        if source.isPDF {
+                            Button {
+                                NSApp.activate(ignoringOtherApps: true)
+                                openWindow(id: "source", value: SourceTarget(docID: source.docID, page: source.page, quote: source.quote))
+                            } label: {
+                                Image(systemName: "doc.text.magnifyingglass")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(L10n.t(.openSource))
+                        }
+                        if let link = source.link, let url = URL(string: link) {
+                            Button {
+                                NSWorkspace.shared.open(url)
+                            } label: {
+                                Image(systemName: "link")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(link)
+                        }
+                    }
+                    if let quote = source.quote {
+                        HStack(alignment: .top, spacing: 4) {
+                            Image(systemName: source.verified ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(source.verified ? Color.green : Color.orange)
+                                .help(source.verified ? L10n.t(.quoteVerified) : L10n.t(.quoteUnverified))
+                            Text("„\(quote)“").font(.caption2).italic().foregroundStyle(.secondary).textSelection(.enabled)
+                        }
+                    } else {
+                        Label(L10n.t(.quoteMissing), systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption2).foregroundStyle(.orange)
+                    }
+                }
+            }
+        }
     }
 }

@@ -54,6 +54,10 @@ final class AppSettings: ObservableObject {
     @Published var autoSelect: Bool {
         didSet { defaults.set(autoSelect, forKey: "autoSelect") }
     }
+    /// Strahlentherapie-Fachmodus: yalnızca bilgi bankasındaki kaynaklardan cevap ver.
+    @Published var evidenceMode: Bool {
+        didSet { defaults.set(evidenceMode, forKey: "evidenceMode") }
+    }
     @Published var responseSpeed: ResponseSpeed {
         didSet { defaults.set(responseSpeed.rawValue, forKey: "responseSpeed") }
     }
@@ -99,6 +103,7 @@ final class AppSettings: ObservableObject {
         if case let .custom(id) = savedProvider, !savedCustom.contains(where: { $0.id == id }) { savedProvider = .builtin(.anthropic) }
         provider = savedProvider
         autoSelect = defaults.object(forKey: "autoSelect") as? Bool ?? true
+        evidenceMode = defaults.bool(forKey: "evidenceMode")
         responseSpeed = ResponseSpeed(rawValue: defaults.string(forKey: "responseSpeed") ?? "") ?? .fast
         anthropicModel = defaults.string(forKey: "model.anthropic") ?? AIProviderKind.anthropic.defaultModel
         openAIModel = defaults.string(forKey: "model.openai") ?? AIProviderKind.openai.defaultModel

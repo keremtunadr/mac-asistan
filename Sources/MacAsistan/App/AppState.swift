@@ -12,10 +12,13 @@ final class AppState: ObservableObject {
     let store = ChatStore()
     let speechIn = SpeechInput()
     let speechOut = SpeechOutput()
+    let knowledge = KnowledgeBase()
 
     /// Keychain'den okunan anahtarlar (tekrar tekrar Keychain'e sormamak için bellekte tutulur).
     @Published private(set) var apiKeys: [ProviderRef: String] = [:]
     @Published private(set) var isSending = false
+    /// "Kaynaklarda aranıyor…" gibi ara durum metni
+    @Published private(set) var statusText: String?
 
     /// SwiftUI pencerelerini kod içinden açabilmek için (menü çubuğu görünümü tarafından atanır).
     var openWindowAction: OpenWindowAction? {
@@ -149,6 +152,7 @@ final class AppState: ObservableObject {
         for publisher in [speechIn.objectWillChange.eraseToAnyPublisher(),
                           speechOut.objectWillChange.eraseToAnyPublisher(),
                           store.objectWillChange.eraseToAnyPublisher(),
+                          knowledge.objectWillChange.eraseToAnyPublisher(),
                           settings.objectWillChange.eraseToAnyPublisher()] {
             publisher.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         }
@@ -272,7 +276,23 @@ final class AppState: ObservableObject {
         isSending = true
         defer { isSending = false }
 
-        let system = systemPrompt(viaVoice: viaVoice)
+        var system = systemPrompt(viaVoice: viaVoice)
+        var evidenceHits: [KBHit]?
+        if settings.evidenceMode {
+            // RETRIEVE: yalnızca kullanıcının bilgi bankası
+            statusText = L10n.t(.searchingSources)
+            let hits = await retrieveEvidence(question: text, turns: turns, provider: first)
+            statusText = nil
+            guard !hits.isEmpty else {
+                let message = Evidence.notFound(for: SpeechOutput.detectLanguage(text) ?? "de")
+                store.append(ChatMessage(role: .assistant, text: message, sources: []), to: conversationID)
+                if settings.readAloud { speak(message) }
+                return
+            }
+            evidenceHits = hits
+            system = Evidence.systemPrompt(hits: hits, uiLanguage: settings.uiLanguage)
+        }
+
         var failures: [(ProviderRef, String, Error)] = []
 
         for (index, provider) in candidates.enumerated() {
@@ -280,7 +300,7 @@ final class AppState: ObservableObject {
             if key == nil && settings.requiresKey(provider) { continue }
             let model = settings.model(for: provider)
             let messageID = UUID()
-            streaming = StreamingTarget(conversationID: conversationID, messageID: messageID, model: model)
+            streaming = StreamingTarget(conversationID: conversationID, messageID: messageID, model: model, evidence: evidenceHits != nil)
             if settings.readAloud { speechOut.beginStream(fallbackLanguage: settings.speechLanguage.languageCode) }
             do {
                 let answer = try await settings.client(for: provider).stream(
@@ -289,13 +309,23 @@ final class AppState: ObservableObject {
                     await self?.receivePartial(partial, messageID: messageID)
                 }
                 cooldownUntil[provider] = nil
+                var finalText = answer
+                var spokenText = answer
+                var sources: [CitedSource]?
+                if let hits = evidenceHits {
+                    // VERIFY + CITE: referansları uygulama oluşturur, alıntıları kaynakta kontrol eder.
+                    let result = Evidence.finalize(raw: answer, hits: hits)
+                    finalText = result.answer
+                    sources = result.sources
+                    spokenText = Evidence.visibleText(answer)
+                }
                 if streaming?.messageID == messageID && streaming?.created == true {
-                    store.updateText(of: messageID, in: conversationID, to: answer, persist: true)
+                    store.updateText(of: messageID, in: conversationID, to: finalText, sources: sources, persist: true)
                 } else {
-                    store.append(ChatMessage(id: messageID, role: .assistant, text: answer, model: model), to: conversationID)
+                    store.append(ChatMessage(id: messageID, role: .assistant, text: finalText, model: model, sources: sources), to: conversationID)
                 }
                 if streaming?.messageID == messageID { streaming = nil }
-                if settings.readAloud { speechOut.finishStream(answer) }
+                if settings.readAloud { speechOut.finishStream(spokenText) }
                 return
             } catch {
                 let partialShown = streaming?.messageID == messageID && streaming?.created == true
@@ -334,12 +364,14 @@ final class AppState: ObservableObject {
         let conversationID: UUID
         let messageID: UUID
         let model: String
+        var evidence = false
         var created = false
     }
     private var streaming: StreamingTarget?
 
-    private func receivePartial(_ text: String, messageID: UUID) {
+    private func receivePartial(_ raw: String, messageID: UUID) {
         guard var target = streaming, target.messageID == messageID else { return }
+        let text = target.evidence ? Evidence.visibleText(raw) : raw
         if target.created {
             store.updateText(of: messageID, in: target.conversationID, to: text)
         } else {
@@ -348,6 +380,25 @@ final class AppState: ObservableObject {
             streaming = target
         }
         if settings.readAloud { speechOut.updateStream(text) }
+    }
+
+    /// Soruyu arama terimlerine çevirip (Almanca/İngilizce) bilgi bankasında arar.
+    private func retrieveEvidence(question: String, turns: [ChatTurn], provider: ProviderRef) async -> [KBHit] {
+        guard !knowledge.readyDocuments.isEmpty else { return [] }
+        var queries = [question]
+        let recent = turns.suffix(6)
+            .map { ($0.role == .user ? "User: " : "Assistant: ") + String($0.text.prefix(600)) }
+            .joined(separator: "\n")
+        let key = key(for: provider) ?? (settings.requiresKey(provider) ? nil : "")
+        if let key {
+            let raw = try? await settings.client(for: provider).stream(
+                system: Evidence.queryPrompt,
+                turns: [ChatTurn(role: .user, text: "Conversation:\n\(recent)\n\nLatest question: \(question)")],
+                model: settings.model(for: provider), apiKey: key, speed: .fast
+            ) { _ in }
+            if let raw { queries += Evidence.parseQueries(raw) }
+        }
+        return knowledge.search(queries, limit: 10)
     }
 
     private func describe(_ error: Error) -> String {

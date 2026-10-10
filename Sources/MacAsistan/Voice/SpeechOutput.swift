@@ -194,6 +194,7 @@ final class SpeechOutput: NSObject, ObservableObject {
         result = result.replacingOccurrences(of: "```[\\s\\S]*?```", with: " ", options: .regularExpression)
         result = result.replacingOccurrences(of: "\\[([^\\]]+)\\]\\([^)]+\\)", with: "$1", options: .regularExpression)
         result = result.replacingOccurrences(of: "https?://\\S+", with: " ", options: .regularExpression)
+        result = result.replacingOccurrences(of: "\\[(S?\\d+|\\?)\\]", with: "", options: .regularExpression)
         result = result.replacingOccurrences(of: "[*_#>`|~]", with: "", options: .regularExpression)
         result = result.replacingOccurrences(of: "(?m)^\\s*[-•]\\s+", with: "", options: .regularExpression)
         return result.trimmingCharacters(in: .whitespacesAndNewlines)

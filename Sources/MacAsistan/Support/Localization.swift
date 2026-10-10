@@ -47,6 +47,9 @@ enum LKey: String {
     case untitledChat
     case otherAIs, otherAIsHint, addAI, customOpenAI, newAIName, name, baseURL, removeAI, removeAIConfirm, keyRequired, keyNotNeeded
     case showInDock
+    case evidenceMode, evidenceModeHint, evidenceBanner, library, libraryTitle, addPDF, addLink, linkPlaceholder, add
+    case docTitle, docAuthors, docYear, docVersion, docURL, docDOI, docPages, docChunks, docOCR, docAdded, docProcessing, docFailed, docReady
+    case libraryEmpty, libraryPrivacy, sources, openSource, quoteVerified, quoteUnverified, quoteMissing, searchingSources, openInPreview
     case speed, speedFast, speedBalanced, speedDeep, speedHint
     case automatic, autoSelect, autoSelectHint, allProvidersFailed, preferredProvider
     case testKey, testOK, keyFormatWarning, hintInvalidKey, hintModelNotFound, hintBilling
@@ -186,6 +189,45 @@ enum L10n {
         .speedHint: ("Hızlı: günlük sohbet ve sesli kullanım için. Derin düşün: zor sorular için, daha yavaş ve daha pahalı. Daha da hız için daha küçük bir model seç (ör. claude-haiku-5-5).",
                      "Schnell: für Alltag und Sprachbedienung. Gründlich: für schwierige Fragen, langsamer und teurer. Noch schneller: ein kleineres Modell wählen (z. B. claude-haiku-5-5).",
                      "Fast: for everyday chat and voice. Thorough: for hard questions, slower and more expensive. For even more speed pick a smaller model (e.g. claude-haiku-5-5)."),
+        .evidenceMode: ("Kaynaklı mod (Strahlentherapie)", "Quellenmodus (Strahlentherapie)", "Source mode (radiation oncology)"),
+        .evidenceModeHint: ("Açıkken cevaplar yalnızca bilgi bankandaki kaynaklardan verilir; her bilgi sayfa numarasıyla kaynaklanır ve alıntılar kaynakta doğrulanır.",
+                            "Wenn aktiv, wird ausschließlich aus Ihrer Wissensdatenbank geantwortet; jede Aussage wird mit Seitenangabe belegt und die Zitate werden in der Quelle geprüft.",
+                            "When on, answers come only from your knowledge base; every statement is cited with its page and quotes are checked against the source."),
+        .evidenceBanner: ("Kaynaklı mod açık: yalnızca bilgi bankasındaki %d kaynak kullanılır.",
+                          "Quellenmodus aktiv: nur %d Quellen aus Ihrer Wissensdatenbank werden verwendet.",
+                          "Source mode on: only the %d sources in your knowledge base are used."),
+        .library: ("Bilgi bankası", "Wissensdatenbank", "Knowledge base"),
+        .libraryTitle: ("Bilgi bankası – onaylı kaynaklar", "Wissensdatenbank – freigegebene Quellen", "Knowledge base – approved sources"),
+        .addPDF: ("PDF ekle…", "PDF hinzufügen…", "Add PDF…"),
+        .addLink: ("URL / DOI ekle", "URL / DOI hinzufügen", "Add URL / DOI"),
+        .linkPlaceholder: ("https://… veya 10.1016/…", "https://… oder 10.1016/…", "https://… or 10.1016/…"),
+        .add: ("Ekle", "Hinzufügen", "Add"),
+        .docTitle: ("Başlık", "Titel", "Title"),
+        .docAuthors: ("Yazarlar / kurum", "Autoren / Organisation", "Authors / organisation"),
+        .docYear: ("Yıl", "Jahr", "Year"),
+        .docVersion: ("Sürüm / güncelleme", "Version / Stand", "Version / update"),
+        .docURL: ("URL", "URL", "URL"),
+        .docDOI: ("DOI", "DOI", "DOI"),
+        .docPages: ("sayfa", "Seiten", "pages"),
+        .docChunks: ("parça", "Abschnitte", "passages"),
+        .docOCR: ("OCR ile okunan sayfa", "per OCR gelesene Seiten", "pages read via OCR"),
+        .docAdded: ("Eklendi", "Hinzugefügt", "Added"),
+        .docProcessing: ("İşleniyor…", "Wird verarbeitet…", "Processing…"),
+        .docFailed: ("Hata", "Fehler", "Failed"),
+        .docReady: ("Hazır", "Bereit", "Ready"),
+        .libraryEmpty: ("Henüz kaynak yok. PDF'leri buraya sürükle ya da \"PDF ekle\" ile seç; URL veya DOI de ekleyebilirsin.",
+                        "Noch keine Quellen. Ziehen Sie PDFs hierher oder wählen Sie \"PDF hinzufügen\"; URLs oder DOIs sind ebenfalls möglich.",
+                        "No sources yet. Drag PDFs here or use \"Add PDF\"; you can also add URLs or DOIs."),
+        .libraryPrivacy: ("Kaynaklar yalnızca bu Mac'te saklanır ve yerel olarak aranır. Soru sorduğunda, sorun ve en ilgili pasajlar seçili yapay zekâ sağlayıcısına gönderilir. Tanımlanabilir hasta bilgisi girme.",
+                          "Quellen werden nur auf diesem Mac gespeichert und lokal durchsucht. Bei einer Frage werden die Frage und die relevantesten Passagen an den gewählten KI-Anbieter gesendet. Keine identifizierbaren Patientendaten eingeben.",
+                          "Sources are stored only on this Mac and searched locally. When you ask, your question and the most relevant passages are sent to the selected AI provider. Do not enter identifiable patient data."),
+        .sources: ("Kaynaklar", "Quellen", "Sources"),
+        .openSource: ("Kaynağı aç", "Quelle öffnen", "Open source"),
+        .quoteVerified: ("Alıntı kaynakta doğrulandı", "Zitat in der Quelle verifiziert", "Quote verified in source"),
+        .quoteUnverified: ("Alıntı kaynakta birebir bulunamadı – kontrol et", "Zitat nicht wörtlich in der Quelle gefunden – bitte prüfen", "Quote not found verbatim in source – please check"),
+        .quoteMissing: ("Alıntı verilmedi – kontrol et", "Kein Zitat angegeben – bitte prüfen", "No quote given – please check"),
+        .searchingSources: ("Kaynaklarda aranıyor…", "Quellen werden durchsucht…", "Searching sources…"),
+        .openInPreview: ("Önizleme'de aç", "In Vorschau öffnen", "Open in Preview"),
         .showInDock: ("Dock'ta göster", "Im Dock anzeigen", "Show in Dock"),
         .automatic: ("Otomatik", "Automatisch", "Automatic"),
         .autoSelect: ("Sağlayıcıyı otomatik seç", "Anbieter automatisch wählen", "Choose provider automatically"),

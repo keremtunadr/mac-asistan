@@ -65,6 +65,16 @@ struct MenuBarView: View {
 
             Toggle(L10n.t(.wakeWord), isOn: Binding(get: { settings.wakeWordEnabled }, set: { settings.wakeWordEnabled = $0 }))
             Toggle(L10n.t(.readAloud), isOn: Binding(get: { settings.readAloud }, set: { settings.readAloud = $0 }))
+            HStack {
+                Toggle(L10n.t(.evidenceMode), isOn: Binding(get: { settings.evidenceMode }, set: { settings.evidenceMode = $0 }))
+                Spacer()
+                Button {
+                    show("library")
+                } label: {
+                    Image(systemName: "books.vertical")
+                }
+                .help(L10n.t(.library))
+            }
 
             Divider()
 

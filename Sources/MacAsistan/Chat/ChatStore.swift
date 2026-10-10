@@ -10,6 +10,8 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var viaVoice = false
     var isError = false
     var model: String?
+    /// Kaynaklı moddaki doğrulanmış referanslar
+    var sources: [CitedSource]?
 }
 
 struct Conversation: Identifiable, Codable, Equatable {
@@ -76,10 +78,11 @@ final class ChatStore: ObservableObject {
     }
 
     /// Akış sırasında bir mesajın metnini günceller (diske her parçada yazmaz).
-    func updateText(of messageID: UUID, in conversationID: UUID, to text: String, persist: Bool = false) {
+    func updateText(of messageID: UUID, in conversationID: UUID, to text: String, sources: [CitedSource]? = nil, persist: Bool = false) {
         guard let c = conversations.firstIndex(where: { $0.id == conversationID }),
               let m = conversations[c].messages.firstIndex(where: { $0.id == messageID }) else { return }
         conversations[c].messages[m].text = text
+        if let sources { conversations[c].messages[m].sources = sources }
         if persist {
             conversations[c].updatedAt = Date()
             save()
