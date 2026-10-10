@@ -56,6 +56,17 @@ Bunu sadece bir kez yapman yeterli.
 - Konuşma tanıma mümkün olduğunda **cihaz üzerinde** çalışır. Dil paketi yoksa **Sistem Ayarları › Klavye › Dikte** bölümünden indirebilirsin.
 - Sohbet geçmişi sadece bu Mac'te tutulur: `~/Library/Application Support/MacAsistan/history.json`
 
+### Kaynaklı mod (Strahlentherapie)
+
+Sohbet penceresinin üstündeki **📚 Kaynaklı mod** düğmesiyle açılır. Bu modda:
+
+- Cevaplar **yalnızca** Bilgi bankasına eklediğin kaynaklardan verilir (PDF, kılavuz, URL, DOI). Kaynakları **📚 › Bilgi bankası** penceresinden eklersin; taranmış PDF'ler cihaz üzerinde OCR ile okunur.
+- Soru, Almanca ve İngilizce arama terimlerine çevrilir ve kaynaklarda **yerel olarak** aranır. Uygun bir pasaj yoksa sabit "bulunamadı" cevabı verilir.
+- Kaynak listesini (başlık, yıl, sürüm, sayfa, bölüm, bağlantı) yapay zekâ değil **uygulama** oluşturur. Yapay zekânın verdiği her alıntı ilgili sayfada birebir aranır: ✓ doğrulandı, ⚠ kontrol et.
+- 🔍 düğmesi PDF'i ilgili sayfada açar ve alıntıyı vurgular.
+- Varsayılan cevap dili Almancadır. Türkçe sorarsan Türkçe, İngilizce sorarsan İngilizce cevap gelir.
+- Klinik karar desteği içindir; tedavi kararı vermez. Tanımlanabilir hasta bilgisi girme: soru ve ilgili pasajlar seçili yapay zekâ sağlayıcısına gönderilir.
+
 **Gereksinimler:** macOS 14 Sonoma veya daha yenisi. Apple Silicon (M1/M2/M3/M4…) ve Intel Mac'lerde çalışır.
 
 ---
