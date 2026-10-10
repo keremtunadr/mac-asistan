@@ -24,8 +24,8 @@ struct ChatView: View {
                 Picker(L10n.t(.provider), selection: Binding(get: { app.settings.providerSelection }, set: { app.settings.providerSelection = $0 })) {
                     Text("✨ \(L10n.t(.automatic))").tag("auto")
                     Divider()
-                    ForEach(AIProviderKind.allCases) { kind in
-                        Text("\(kind.displayName) · \(app.settings.model(for: kind))").tag(kind.rawValue)
+                    ForEach(app.settings.allProviders, id: \.self) { ref in
+                        Text("\(app.settings.displayName(ref)) · \(app.settings.model(for: ref))").tag(ref.rawValue)
                     }
                 }
                 .help(L10n.t(.provider))

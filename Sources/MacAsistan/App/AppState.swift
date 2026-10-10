@@ -14,7 +14,7 @@ final class AppState: ObservableObject {
     let speechOut = SpeechOutput()
 
     /// Keychain'den okunan anahtarlar (tekrar tekrar Keychain'e sormamak için bellekte tutulur).
-    @Published private(set) var apiKeys: [AIProviderKind: String] = [:]
+    @Published private(set) var apiKeys: [ProviderRef: String] = [:]
     @Published private(set) var isSending = false
 
     /// SwiftUI pencerelerini kod içinden açabilmek için (menü çubuğu görünümü tarafından atanır).
@@ -41,26 +41,31 @@ final class AppState: ObservableObject {
 
     /// Anahtarları Keychain'den yeniden okur (başka bir pencerede/oturumda kaydedilmiş olabilir).
     func reloadKeys() {
-        var keys: [AIProviderKind: String] = [:]
-        for kind in AIProviderKind.allCases {
-            if let key = Keychain.get(account: kind.keychainAccount) { keys[kind] = key }
+        var keys: [ProviderRef: String] = [:]
+        for ref in settings.allProviders {
+            if let key = Keychain.get(account: ref.keychainAccount) { keys[ref] = key }
         }
         if keys != apiKeys { apiKeys = keys }
     }
 
     /// Bellekte yoksa Keychain'e bir kez daha bakar.
-    private func key(for kind: AIProviderKind) -> String? {
-        if let key = apiKeys[kind] { return key }
+    private func key(for ref: ProviderRef) -> String? {
+        if let key = apiKeys[ref] { return key }
         reloadKeys()
-        return apiKeys[kind]
+        return apiKeys[ref]
+    }
+
+    /// Kullanılabilir mi: anahtarı var ya da anahtar gerektirmiyor (ör. Ollama).
+    func isUsable(_ ref: ProviderRef) -> Bool {
+        apiKeys[ref] != nil || !settings.requiresKey(ref)
     }
 
     var hasKeyForCurrentProvider: Bool {
-        settings.autoSelect ? !apiKeys.isEmpty : apiKeys[settings.provider] != nil
+        settings.autoSelect ? settings.allProviders.contains(where: isUsable) : isUsable(settings.provider)
     }
 
     /// Yakın zamanda başarısız olan sağlayıcılar bu zamana kadar atlanır (otomatik modda).
-    private var cooldownUntil: [AIProviderKind: Date] = [:]
+    private var cooldownUntil: [ProviderRef: Date] = [:]
     private static let cooldown: TimeInterval = 10 * 60
 
     /// Bu hata başka bir sağlayıcıyı denemeye değer mi? (anahtar, kredi, model, sunucu, ağ)
@@ -74,11 +79,11 @@ final class AppState: ObservableObject {
     }
 
     /// Denenecek sağlayıcılar, sırasıyla.
-    private func providerCandidates() -> [AIProviderKind] {
+    private func providerCandidates() -> [ProviderRef] {
         let preferred = settings.provider
         guard settings.autoSelect else { return [preferred] }
-        let ordered = [preferred] + AIProviderKind.allCases.filter { $0 != preferred }
-        let withKeys = ordered.filter { key(for: $0) != nil }
+        let ordered = [preferred] + settings.allProviders.filter { $0 != preferred }
+        let withKeys = ordered.filter { key(for: $0) != nil || !settings.requiresKey($0) }
         let now = Date()
         let ready = withKeys.filter { (cooldownUntil[$0] ?? .distantPast) <= now }
         // Hepsi beklemedeyse yine de hepsini dene.
@@ -187,38 +192,49 @@ final class AppState: ObservableObject {
 
     // MARK: - API anahtarları
 
-    func saveKey(_ key: String, for kind: AIProviderKind) throws {
+    func saveKey(_ key: String, for ref: ProviderRef) throws {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        try Keychain.set(trimmed, account: kind.keychainAccount)
-        apiKeys[kind] = trimmed
+        try Keychain.set(trimmed, account: ref.keychainAccount)
+        apiKeys[ref] = trimmed
+        cooldownUntil[ref] = nil
         settings.hasCompletedOnboarding = true
     }
 
     /// Ayarlarda göstermek için: "sk-ant-…KrJM"
-    func maskedKey(for kind: AIProviderKind) -> String? {
-        guard let key = apiKeys[kind] else { return nil }
+    func maskedKey(for ref: ProviderRef) -> String? {
+        guard let key = apiKeys[ref] else { return nil }
         guard key.count > 12 else { return String(repeating: "•", count: key.count) }
         return "\(key.prefix(7))…\(key.suffix(4))"
     }
 
-    /// Anahtarı sağlayıcıya küçük bir istekle dener (model listesini çeker).
-    func testKey(for kind: AIProviderKind) async -> Result<Int, Error> {
+    /// Anahtarı/bağlantıyı sağlayıcıya küçük bir istekle dener (model listesini çeker).
+    func testKey(for ref: ProviderRef) async -> Result<Int, Error> {
         do {
-            return .success(try await listModels(for: kind).count)
+            return .success(try await listModels(for: ref).count)
         } catch {
             return .failure(error)
         }
     }
 
-    func deleteKey(for kind: AIProviderKind) {
-        Keychain.delete(account: kind.keychainAccount)
-        apiKeys[kind] = nil
+    func deleteKey(for ref: ProviderRef) {
+        Keychain.delete(account: ref.keychainAccount)
+        apiKeys[ref] = nil
     }
 
-    func listModels(for kind: AIProviderKind) async throws -> [String] {
-        guard let key = key(for: kind) else { throw AIError.http(401, L10n.t(.keyNotSet)) }
-        return try await kind.makeClient().listModels(apiKey: key)
+    func listModels(for ref: ProviderRef) async throws -> [String] {
+        let key = key(for: ref)
+        if key == nil && settings.requiresKey(ref) { throw AIError.http(401, L10n.t(.keyNotSet)) }
+        return try await settings.client(for: ref).listModels(apiKey: key ?? "")
+    }
+
+    func addCustomProvider(from template: CustomProvider) {
+        settings.addCustom(from: template)
+    }
+
+    func removeCustomProvider(_ id: UUID) {
+        deleteKey(for: .custom(id))
+        settings.removeCustom(id)
     }
 
     // MARK: - Sohbet
@@ -231,9 +247,9 @@ final class AppState: ObservableObject {
         store.append(ChatMessage(role: .user, text: text, viaVoice: viaVoice), to: conversationID)
 
         let candidates = providerCandidates()
-        guard !candidates.isEmpty, key(for: candidates[0]) != nil else {
-            let provider = settings.provider
-            store.append(ChatMessage(role: .assistant, text: "\(L10n.t(.noApiKey)): \(provider.displayName). \(L10n.t(.noApiKeyHint))", isError: true), to: conversationID)
+        guard let first = candidates.first, key(for: first) != nil || !settings.requiresKey(first) else {
+            let name = settings.displayName(settings.provider)
+            store.append(ChatMessage(role: .assistant, text: "\(L10n.t(.noApiKey)): \(name). \(L10n.t(.noApiKeyHint))", isError: true), to: conversationID)
             openWindow("settings")
             return
         }
@@ -246,13 +262,14 @@ final class AppState: ObservableObject {
         defer { isSending = false }
 
         let system = systemPrompt(viaVoice: viaVoice)
-        var failures: [(AIProviderKind, String, Error)] = []
+        var failures: [(ProviderRef, String, Error)] = []
 
         for (index, provider) in candidates.enumerated() {
-            guard let key = key(for: provider) else { continue }
+            let key = key(for: provider)
+            if key == nil && settings.requiresKey(provider) { continue }
             let model = settings.model(for: provider)
             do {
-                let answer = try await provider.makeClient().complete(system: system, turns: turns, model: model, apiKey: key)
+                let answer = try await settings.client(for: provider).complete(system: system, turns: turns, model: model, apiKey: key ?? "")
                 cooldownUntil[provider] = nil
                 store.append(ChatMessage(role: .assistant, text: answer, model: model), to: conversationID)
                 if settings.readAloud { speak(answer) }
@@ -271,7 +288,7 @@ final class AppState: ObservableObject {
         if failures.count == 1, let failure = failures.first {
             store.append(ChatMessage(role: .assistant, text: describe(failure.2), isError: true, model: failure.1), to: conversationID)
         } else {
-            let lines = failures.map { "• \($0.0.displayName) (\($0.1)): \(describe($0.2))" }
+            let lines = failures.map { "• \(settings.displayName($0.0)) (\($0.1)): \(describe($0.2))" }
             let text = L10n.t(.allProvidersFailed) + "\n\n" + lines.joined(separator: "\n\n")
             store.append(ChatMessage(role: .assistant, text: text, isError: true), to: conversationID)
         }

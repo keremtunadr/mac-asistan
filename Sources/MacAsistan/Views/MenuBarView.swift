@@ -74,13 +74,13 @@ struct MenuBarView: View {
                 Picker("", selection: Binding(get: { settings.providerSelection }, set: { settings.providerSelection = $0 })) {
                     Text("✨ \(L10n.t(.automatic))").tag("auto")
                     Divider()
-                    ForEach(AIProviderKind.allCases) { kind in
-                        Text(kind.displayName).tag(kind.rawValue)
+                    ForEach(settings.allProviders, id: \.self) { ref in
+                        Text(settings.displayName(ref)).tag(ref.rawValue)
                     }
                 }
                 .labelsHidden()
                 Text(settings.autoSelect
-                     ? "\(L10n.t(.preferredProvider)): \(settings.provider.displayName) · \(settings.currentModel)"
+                     ? "\(L10n.t(.preferredProvider)): \(settings.displayName(settings.provider)) · \(settings.currentModel)"
                      : "\(L10n.t(.model)): \(settings.currentModel)")
                     .font(.caption)
                     .foregroundStyle(.secondary)

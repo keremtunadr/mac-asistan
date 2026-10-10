@@ -58,13 +58,13 @@ private struct AITab: View {
     @EnvironmentObject var app: AppState
     private var settings: AppSettings { app.settings }
 
-    @State private var loadedModels: [AIProviderKind: [String]] = [:]
+    @State private var loadedModels: [ProviderRef: [String]] = [:]
     @State private var loading = false
     @State private var info: String?
 
     var body: some View {
         Form {
-            if app.apiKeys.isEmpty {
+            if app.apiKeys.isEmpty && settings.customProviders.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(L10n.t(.welcomeTitle)).font(.headline)
@@ -79,8 +79,8 @@ private struct AITab: View {
                     Text(L10n.t(.autoSelectHint)).font(.caption).foregroundStyle(.secondary)
                 }
                 Picker(settings.autoSelect ? L10n.t(.preferredProvider) : L10n.t(.provider),
-                       selection: Binding(get: { settings.provider }, set: { settings.provider = $0 })) {
-                    ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
+                       selection: Binding(get: { settings.provider }, set: { settings.provider = $0; info = nil })) {
+                    ForEach(settings.allProviders, id: \.self) { Text(settings.displayName($0)).tag($0) }
                 }
                 HStack {
                     TextField(L10n.t(.model), text: Binding(
@@ -88,7 +88,7 @@ private struct AITab: View {
                         set: { settings.setModel($0, for: settings.provider) }
                     ))
                     Menu {
-                        let models = loadedModels[settings.provider] ?? settings.provider.suggestedModels
+                        let models = loadedModels[settings.provider] ?? settings.suggestedModels(settings.provider)
                         ForEach(models, id: \.self) { model in
                             Button(model) { settings.setModel(model, for: settings.provider) }
                         }
@@ -98,7 +98,7 @@ private struct AITab: View {
                     .menuStyle(.borderlessButton)
                     .fixedSize()
                     Button(L10n.t(.loadModels)) { Task { await loadModels() } }
-                        .disabled(loading || app.apiKeys[settings.provider] == nil)
+                        .disabled(loading || !app.isUsable(settings.provider))
                 }
                 if let info {
                     Text(info).font(.caption).foregroundStyle(.secondary)
@@ -109,7 +109,7 @@ private struct AITab: View {
 
             Section {
                 ForEach(AIProviderKind.allCases) { kind in
-                    APIKeyRow(kind: kind)
+                    APIKeyRow(ref: .builtin(kind))
                 }
             } header: {
                 Text(L10n.t(.apiKeys))
@@ -118,6 +118,28 @@ private struct AITab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                ForEach(settings.customProviders) { provider in
+                    CustomProviderRow(id: provider.id)
+                }
+                Menu {
+                    ForEach(CustomProvider.presets, id: \.name) { preset in
+                        Button(preset.name) { app.addCustomProvider(from: preset) }
+                    }
+                    Divider()
+                    Button(L10n.t(.customOpenAI)) {
+                        app.addCustomProvider(from: CustomProvider(name: L10n.t(.newAIName), baseURL: "https://", model: ""))
+                    }
+                } label: {
+                    Label(L10n.t(.addAI), systemImage: "plus.circle.fill")
+                }
+                .fixedSize()
+            } header: {
+                Text(L10n.t(.otherAIs))
+            } footer: {
+                Text(L10n.t(.otherAIsHint)).font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }
@@ -125,10 +147,10 @@ private struct AITab: View {
     private func loadModels() async {
         loading = true
         defer { loading = false }
-        let kind = settings.provider
+        let ref = settings.provider
         do {
-            let models = try await app.listModels(for: kind)
-            loadedModels[kind] = models.isEmpty ? kind.suggestedModels : models
+            let models = try await app.listModels(for: ref)
+            loadedModels[ref] = models.isEmpty ? settings.suggestedModels(ref) : models
             info = "\(models.count) \(L10n.t(.modelsLoaded))"
         } catch {
             info = "\(L10n.t(.errorPrefix)): \(error.localizedDescription)"
@@ -136,26 +158,83 @@ private struct AITab: View {
     }
 }
 
+/// Kullanıcının eklediği bir yapay zekâ: ad, adres, model, anahtar.
+private struct CustomProviderRow: View {
+    @EnvironmentObject var app: AppState
+    let id: UUID
+    @State private var confirmRemove = false
+
+    private var settings: AppSettings { app.settings }
+
+    private func binding(_ keyPath: WritableKeyPath<CustomProvider, String>) -> Binding<String> {
+        Binding(
+            get: { settings.custom(id)?[keyPath: keyPath] ?? "" },
+            set: { value in settings.updateCustom(id) { $0[keyPath: keyPath] = value } }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                TextField(L10n.t(.name), text: binding(\.name))
+                    .font(.headline)
+                    .textFieldStyle(.plain)
+                Spacer()
+                Button(role: .destructive) {
+                    confirmRemove = true
+                } label: {
+                    Label(L10n.t(.removeAI), systemImage: "minus.circle")
+                }
+                .controlSize(.small)
+            }
+            LabeledContent(L10n.t(.baseURL)) {
+                TextField("https://…/v1", text: binding(\.baseURL))
+                    .font(.system(.body, design: .monospaced))
+            }
+            LabeledContent(L10n.t(.model)) {
+                TextField("model-id", text: binding(\.model))
+                    .font(.system(.body, design: .monospaced))
+            }
+            Toggle(L10n.t(.keyRequired), isOn: Binding(
+                get: { settings.custom(id)?.requiresKey ?? true },
+                set: { value in settings.updateCustom(id) { $0.requiresKey = value } }
+            ))
+            .controlSize(.small)
+            APIKeyRow(ref: .custom(id), showName: false)
+        }
+        .padding(.vertical, 4)
+        .confirmationDialog(L10n.t(.removeAIConfirm), isPresented: $confirmRemove) {
+            Button(L10n.t(.removeAI), role: .destructive) { app.removeCustomProvider(id) }
+            Button(L10n.t(.cancel), role: .cancel) {}
+        }
+    }
+}
+
 private struct APIKeyRow: View {
     @EnvironmentObject var app: AppState
-    let kind: AIProviderKind
+    let ref: ProviderRef
+    var showName = true
     @State private var input = ""
     @State private var error: String?
     @State private var warning: String?
     @State private var testResult: (ok: Bool, text: String)?
     @State private var testing = false
 
+    private var settings: AppSettings { app.settings }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(kind.displayName).frame(width: 140, alignment: .leading)
+                if showName {
+                    Text(settings.displayName(ref)).frame(width: 140, alignment: .leading)
+                }
                 SecureField(L10n.t(.apiKeyPlaceholder), text: $input)
                     .onSubmit(save)
                 Button(L10n.t(.save), action: save)
                     .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty)
-                if app.apiKeys[kind] != nil {
+                if app.apiKeys[ref] != nil {
                     Button(role: .destructive) {
-                        app.deleteKey(for: kind)
+                        app.deleteKey(for: ref)
                     } label: {
                         Image(systemName: "trash")
                     }
@@ -163,17 +242,23 @@ private struct APIKeyRow: View {
                 }
             }
             HStack {
-                if let masked = app.maskedKey(for: kind) {
+                if let masked = app.maskedKey(for: ref) {
                     Text(L10n.t(.keyStored)).foregroundStyle(.green)
                     Text(masked).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                } else if !settings.requiresKey(ref) {
+                    Text(L10n.t(.keyNotNeeded)).foregroundStyle(.secondary)
+                } else {
+                    Text(L10n.t(.keyMissing)).foregroundStyle(.secondary)
+                }
+                if app.isUsable(ref) {
                     Button(L10n.t(.testKey)) { Task { await test() } }
                         .controlSize(.small)
                         .disabled(testing)
                     if testing { ProgressView().controlSize(.small) }
-                } else {
-                    Text(L10n.t(.keyMissing)).foregroundStyle(.secondary)
                 }
-                Link(kind.keyHelpURL.host ?? "", destination: kind.keyHelpURL)
+                if let url = settings.keyHelpURL(ref) {
+                    Link(url.host ?? url.absoluteString, destination: url)
+                }
             }
             .font(.caption)
             if let warning {
@@ -189,26 +274,26 @@ private struct APIKeyRow: View {
     private func save() {
         do {
             let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-            try app.saveKey(trimmed, for: kind)
+            try app.saveKey(trimmed, for: ref)
             input = ""
             error = nil
             testResult = nil
-            warning = trimmed.hasPrefix(kind.keyPrefix) ? nil : formatWarning
+            if let prefix = settings.keyPrefix(ref), !trimmed.hasPrefix(prefix) {
+                warning = String(format: L10n.t(.keyFormatWarning), settings.displayName(ref), prefix)
+            } else {
+                warning = nil
+            }
             Task { await test() }
-            if app.apiKeys[app.settings.provider] == nil { app.settings.provider = kind }
+            if !app.isUsable(settings.provider) { settings.provider = ref }
         } catch {
             self.error = error.localizedDescription
         }
     }
 
-    private var formatWarning: String {
-        String(format: L10n.t(.keyFormatWarning), kind.displayName, kind.keyPrefix)
-    }
-
     private func test() async {
         testing = true
         defer { testing = false }
-        switch await app.testKey(for: kind) {
+        switch await app.testKey(for: ref) {
         case .success:
             testResult = (true, L10n.t(.testOK))
         case let .failure(failure):

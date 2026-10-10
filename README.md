@@ -44,8 +44,12 @@ Bunu sadece bir kez yapman yeterli.
 | Konuşma dilini değiştir | ✨ menüsünde **TR / DE / EN** düğmeleri |
 | Sesli okumayı durdur | Konuşmaya başla, durdur düğmesine bas veya ⌥ Option + Boşluk |
 | Arayüz dili | Ayarlar › Genel › Arayüz dili |
+| Hangi yapay zekâ kullanılsın? | Sohbet penceresinin sağ üstündeki seçici: **✨ Otomatik** veya istediğin sağlayıcı |
+| Başka yapay zekâ ekle | Ayarlar › Yapay Zekâ › **Diğer yapay zekâlar › Yapay zekâ ekle** |
 
 - Konuşman bitince (kısa bir sessizlikten sonra) mesaj kendiliğinden gönderilir. Bekleme süresi Ayarlar › Ses'ten ayarlanır.
+- **Otomatik modda** önce tercih ettiğin sağlayıcı denenir. Anahtarı, kredisi ya da modeli çalışmazsa anahtarı kayıtlı bir sonraki sağlayıcıya geçilir.
+- **Başka yapay zekâlar:** DeepSeek, Mistral, Groq, xAI Grok, OpenRouter, Perplexity, Ollama ve LM Studio hazır olarak listede. "Diğer (OpenAI uyumlu)" seçeneğiyle OpenAI uyumlu API sunan herhangi bir servisi adres, model ve anahtar girerek ekleyebilirsin. İstediğin kadar ekleyebilirsin.
 - Asistan, sen hangi dilde yazarsan ya da konuşursan o dilde cevap verir.
 - Cevaplar dil otomatik algılanarak sesli okunur: Türkçe → **Yelda**, Almanca → **Anna**, İngilizce → **Samantha**.
   Daha doğal sesler için **Sistem Ayarları › Erişilebilirlik › Seslendirilmiş İçerik › Sistem Sesi › Sesleri Yönet** bölümünden bu seslerin "Gelişmiş" (Enhanced) ya da "Premium" sürümlerini indirebilirsin.

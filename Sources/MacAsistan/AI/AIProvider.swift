@@ -139,3 +139,68 @@ extension Array where Element == ChatTurn {
         return result
     }
 }
+
+// MARK: - Kullanıcının eklediği sağlayıcılar
+
+/// Bir sağlayıcıya referans: yerleşik (Claude, OpenAI, Gemini) veya kullanıcının eklediği.
+enum ProviderRef: Hashable {
+    case builtin(AIProviderKind)
+    case custom(UUID)
+
+    init?(rawValue: String) {
+        if let kind = AIProviderKind(rawValue: rawValue) {
+            self = .builtin(kind)
+        } else if rawValue.hasPrefix("custom:"), let id = UUID(uuidString: String(rawValue.dropFirst("custom:".count))) {
+            self = .custom(id)
+        } else {
+            return nil
+        }
+    }
+
+    var rawValue: String {
+        switch self {
+        case let .builtin(kind): return kind.rawValue
+        case let .custom(id): return "custom:\(id.uuidString)"
+        }
+    }
+
+    var keychainAccount: String {
+        switch self {
+        case let .builtin(kind): return kind.keychainAccount
+        case let .custom(id): return "custom.\(id.uuidString)"
+        }
+    }
+}
+
+/// OpenAI uyumlu (Chat Completions) API sunan herhangi bir servis:
+/// DeepSeek, Mistral, Groq, xAI, OpenRouter, Perplexity, Ollama, LM Studio …
+struct CustomProvider: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var name: String
+    var baseURL: String
+    var model: String
+    var requiresKey = true
+    var keyHelpURL: String?
+
+    var ref: ProviderRef { .custom(id) }
+
+    /// Hazır şablonlar. Model adları değişebilir; "Modelleri yükle" ile güncel liste alınabilir.
+    static let presets: [CustomProvider] = [
+        CustomProvider(name: "DeepSeek", baseURL: "https://api.deepseek.com/v1", model: "deepseek-chat",
+                       keyHelpURL: "https://platform.deepseek.com/api_keys"),
+        CustomProvider(name: "Mistral", baseURL: "https://api.mistral.ai/v1", model: "mistral-large-latest",
+                       keyHelpURL: "https://console.mistral.ai/api-keys"),
+        CustomProvider(name: "Groq", baseURL: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile",
+                       keyHelpURL: "https://console.groq.com/keys"),
+        CustomProvider(name: "xAI Grok", baseURL: "https://api.x.ai/v1", model: "grok-4",
+                       keyHelpURL: "https://console.x.ai"),
+        CustomProvider(name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", model: "openrouter/auto",
+                       keyHelpURL: "https://openrouter.ai/keys"),
+        CustomProvider(name: "Perplexity", baseURL: "https://api.perplexity.ai", model: "sonar",
+                       keyHelpURL: "https://www.perplexity.ai/settings/api"),
+        CustomProvider(name: "Ollama (yerel)", baseURL: "http://localhost:11434/v1", model: "llama3.2",
+                       requiresKey: false, keyHelpURL: "https://ollama.com/download"),
+        CustomProvider(name: "LM Studio (yerel)", baseURL: "http://localhost:1234/v1", model: "local-model",
+                       requiresKey: false, keyHelpURL: "https://lmstudio.ai"),
+    ]
+}

@@ -1,11 +1,13 @@
 import Foundation
 
-/// OpenAI Chat Completions API
+/// OpenAI Chat Completions API. Aynı API'yi sunan diğer servisler için de kullanılır (farklı `base` ile).
 struct OpenAIClient: AIClient {
-    private let base = URL(string: "https://api.openai.com/v1")!
+    var base = URL(string: "https://api.openai.com/v1")!
+    /// Yalnızca OpenAI için: model listesinden ses/görsel vb. modelleri ele.
+    var filterOpenAIModels = true
 
     private func headers(_ apiKey: String) -> [String: String] {
-        ["Authorization": "Bearer \(apiKey)"]
+        apiKey.isEmpty ? [:] : ["Authorization": "Bearer \(apiKey)"]
     }
 
     func complete(system: String, turns: [ChatTurn], model: String, apiKey: String) async throws -> String {
@@ -27,6 +29,7 @@ struct OpenAIClient: AIClient {
     func listModels(apiKey: String) async throws -> [String] {
         let json = try await HTTP.send("GET", url: base.appendingPathComponent("models"), headers: headers(apiKey))
         let data = json["data"] as? [[String: Any]] ?? []
+        guard filterOpenAIModels else { return data.compactMap { $0["id"] as? String }.sorted() }
         let excluded = ["audio", "realtime", "tts", "transcribe", "image", "embedding", "moderation", "search", "whisper", "dall-e"]
         return data.compactMap { $0["id"] as? String }
             .filter { id in

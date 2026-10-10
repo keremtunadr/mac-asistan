@@ -45,6 +45,7 @@ enum LKey: String {
     case errorPrefix, refusal, emptyAnswer, voiceMessage
     case emptyChatTitle, emptyChatText
     case untitledChat
+    case otherAIs, otherAIsHint, addAI, customOpenAI, newAIName, name, baseURL, removeAI, removeAIConfirm, keyRequired, keyNotNeeded
     case automatic, autoSelect, autoSelectHint, allProvidersFailed, preferredProvider
     case testKey, testOK, keyFormatWarning, hintInvalidKey, hintModelNotFound, hintBilling
 }
@@ -163,6 +164,19 @@ enum L10n {
                          "Schreib oder tippe aufs Mikrofon. Du kannst Türkisch, Deutsch oder Englisch sprechen.",
                          "Type or tap the microphone. You can speak Turkish, German or English."),
         .untitledChat: ("Yeni sohbet", "Neuer Chat", "New chat"),
+        .otherAIs: ("Diğer yapay zekâlar", "Weitere KIs", "Other AIs"),
+        .otherAIsHint: ("OpenAI uyumlu API sunan her servisi ekleyebilirsin: DeepSeek, Mistral, Groq, xAI, OpenRouter, Perplexity, bilgisayarında çalışan Ollama veya LM Studio …",
+                        "Du kannst jeden Dienst mit OpenAI-kompatibler API hinzufügen: DeepSeek, Mistral, Groq, xAI, OpenRouter, Perplexity, lokal laufendes Ollama oder LM Studio …",
+                        "You can add any service with an OpenAI-compatible API: DeepSeek, Mistral, Groq, xAI, OpenRouter, Perplexity, Ollama or LM Studio running on your Mac …"),
+        .addAI: ("Yapay zekâ ekle", "KI hinzufügen", "Add AI"),
+        .customOpenAI: ("Diğer (OpenAI uyumlu)…", "Andere (OpenAI-kompatibel)…", "Other (OpenAI-compatible)…"),
+        .newAIName: ("Yeni yapay zekâ", "Neue KI", "New AI"),
+        .name: ("Ad", "Name", "Name"),
+        .baseURL: ("Adres (URL)", "Adresse (URL)", "Address (URL)"),
+        .removeAI: ("Kaldır", "Entfernen", "Remove"),
+        .removeAIConfirm: ("Bu yapay zekâ ve anahtarı kaldırılsın mı?", "Diese KI und ihren Schlüssel entfernen?", "Remove this AI and its key?"),
+        .keyRequired: ("API anahtarı gerekli", "API-Schlüssel erforderlich", "API key required"),
+        .keyNotNeeded: ("Anahtar gerekmiyor", "Kein Schlüssel nötig", "No key needed"),
         .automatic: ("Otomatik", "Automatisch", "Automatic"),
         .autoSelect: ("Sağlayıcıyı otomatik seç", "Anbieter automatisch wählen", "Choose provider automatically"),
         .autoSelectHint: ("Önce tercih ettiğin sağlayıcı denenir. Anahtarı, kredisi veya modeli çalışmazsa ya da sunucu cevap vermezse anahtarı kayıtlı diğer sağlayıcıya geçilir.",

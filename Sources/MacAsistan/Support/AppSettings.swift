@@ -39,8 +39,15 @@ final class AppSettings: ObservableObject {
     @Published var uiLanguage: AppLanguage {
         didSet { defaults.set(uiLanguage.rawValue, forKey: "uiLanguage") }
     }
-    @Published var provider: AIProviderKind {
+    /// Elle seçilen ya da otomatik modda ilk denenen sağlayıcı.
+    @Published var provider: ProviderRef {
         didSet { defaults.set(provider.rawValue, forKey: "provider") }
+    }
+    /// Kullanıcının eklediği sağlayıcılar (DeepSeek, Mistral, Ollama …)
+    @Published var customProviders: [CustomProvider] {
+        didSet {
+            if let data = try? JSONEncoder().encode(customProviders) { defaults.set(data, forKey: "customProviders") }
+        }
     }
     /// Açıkken önce `provider` denenir; çalışmazsa anahtarı olan diğer sağlayıcılara geçilir.
     @Published var autoSelect: Bool {
@@ -76,7 +83,11 @@ final class AppSettings: ObservableObject {
 
     private init() {
         uiLanguage = AppLanguage(rawValue: defaults.string(forKey: "uiLanguage") ?? "") ?? .tr
-        provider = AIProviderKind(rawValue: defaults.string(forKey: "provider") ?? "") ?? .anthropic
+        let savedCustom = defaults.data(forKey: "customProviders").flatMap { try? JSONDecoder().decode([CustomProvider].self, from: $0) } ?? []
+        customProviders = savedCustom
+        var savedProvider = ProviderRef(rawValue: defaults.string(forKey: "provider") ?? "") ?? .builtin(.anthropic)
+        if case let .custom(id) = savedProvider, !savedCustom.contains(where: { $0.id == id }) { savedProvider = .builtin(.anthropic) }
+        provider = savedProvider
         autoSelect = defaults.object(forKey: "autoSelect") as? Bool ?? true
         anthropicModel = defaults.string(forKey: "model.anthropic") ?? AIProviderKind.anthropic.defaultModel
         openAIModel = defaults.string(forKey: "model.openai") ?? AIProviderKind.openai.defaultModel
@@ -110,6 +121,88 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    // MARK: Tüm sağlayıcılar (yerleşik + eklenen)
+
+    var allProviders: [ProviderRef] {
+        AIProviderKind.allCases.map { ProviderRef.builtin($0) } + customProviders.map(\.ref)
+    }
+
+    func custom(_ id: UUID) -> CustomProvider? { customProviders.first { $0.id == id } }
+
+    func displayName(_ ref: ProviderRef) -> String {
+        switch ref {
+        case let .builtin(kind): return kind.displayName
+        case let .custom(id): return custom(id)?.name ?? "?"
+        }
+    }
+
+    func model(for ref: ProviderRef) -> String {
+        switch ref {
+        case let .builtin(kind): return model(for: kind)
+        case let .custom(id): return custom(id)?.model ?? ""
+        }
+    }
+
+    func setModel(_ model: String, for ref: ProviderRef) {
+        switch ref {
+        case let .builtin(kind): setModel(model, for: kind)
+        case let .custom(id): updateCustom(id) { $0.model = model.trimmingCharacters(in: .whitespacesAndNewlines) }
+        }
+    }
+
+    func requiresKey(_ ref: ProviderRef) -> Bool {
+        if case let .custom(id) = ref { return custom(id)?.requiresKey ?? true }
+        return true
+    }
+
+    func suggestedModels(_ ref: ProviderRef) -> [String] {
+        switch ref {
+        case let .builtin(kind): return kind.suggestedModels
+        case let .custom(id): return [custom(id)?.model].compactMap { $0 }.filter { !$0.isEmpty }
+        }
+    }
+
+    func keyHelpURL(_ ref: ProviderRef) -> URL? {
+        switch ref {
+        case let .builtin(kind): return kind.keyHelpURL
+        case let .custom(id): return custom(id)?.keyHelpURL.flatMap(URL.init(string:))
+        }
+    }
+
+    func keyPrefix(_ ref: ProviderRef) -> String? {
+        if case let .builtin(kind) = ref { return kind.keyPrefix }
+        return nil
+    }
+
+    func client(for ref: ProviderRef) -> AIClient {
+        switch ref {
+        case let .builtin(kind):
+            return kind.makeClient()
+        case let .custom(id):
+            let raw = (custom(id)?.baseURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+            return OpenAIClient(base: URL(string: trimmed) ?? URL(string: "http://invalid")!, filterOpenAIModels: false)
+        }
+    }
+
+    func updateCustom(_ id: UUID, _ change: (inout CustomProvider) -> Void) {
+        guard let index = customProviders.firstIndex(where: { $0.id == id }) else { return }
+        change(&customProviders[index])
+    }
+
+    @discardableResult
+    func addCustom(from template: CustomProvider) -> CustomProvider {
+        var provider = template
+        provider.id = UUID()
+        customProviders.append(provider)
+        return provider
+    }
+
+    func removeCustom(_ id: UUID) {
+        customProviders.removeAll { $0.id == id }
+        if provider == .custom(id) { provider = .builtin(.anthropic) }
+    }
+
     var currentModel: String { model(for: provider) }
 
     /// Sohbet/menü seçicileri için: "auto" veya sağlayıcı kodu.
@@ -118,9 +211,9 @@ final class AppSettings: ObservableObject {
         set {
             if newValue == "auto" {
                 autoSelect = true
-            } else if let kind = AIProviderKind(rawValue: newValue) {
+            } else if let ref = ProviderRef(rawValue: newValue) {
                 autoSelect = false
-                provider = kind
+                provider = ref
             }
         }
     }
