@@ -1,6 +1,6 @@
 import Foundation
 
-/// Anthropic Messages API (https://api.anthropic.com/v1/messages)
+/// Anthropic Messages API (https://api.anthropic.com/v1/messages), akış (streaming) ile.
 struct AnthropicClient: AIClient {
     private let base = URL(string: "https://api.anthropic.com/v1")!
 
@@ -11,7 +11,15 @@ struct AnthropicClient: AIClient {
         ["x-api-key": apiKey, "anthropic-version": "2023-06-01"]
     }
 
-    func complete(system: String, turns: [ChatTurn], model: String, apiKey: String) async throws -> String {
+    /// `output_config.effort` destekleyen modeller (Claude 4.6 ve sonrası; Haiku 4.5 hariç).
+    private static func supportsEffort(_ model: String) -> Bool {
+        let families = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-5", "claude-fable-5", "claude-mythos-5",
+                        "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6"]
+        return families.contains { model.hasPrefix($0) }
+    }
+
+    func stream(system: String, turns: [ChatTurn], model: String, apiKey: String, speed: ResponseSpeed,
+                onText: @escaping @Sendable (String) async -> Void) async throws -> String {
         let messages: [[String: Any]] = turns.normalizedForAPI().map {
             ["role": $0.role == .user ? "user" : "assistant", "content": $0.text]
         }
@@ -20,35 +28,62 @@ struct AnthropicClient: AIClient {
             "max_tokens": 16000,
             "system": system,
             "messages": messages,
+            "stream": true,
         ]
         var hdrs = headers(apiKey)
-        let useFallback = Self.fallbackModels.contains(model)
-        if useFallback {
+        if Self.fallbackModels.contains(model) {
             body["fallbacks"] = "default"
             hdrs["anthropic-beta"] = "server-side-fallback-2026-07-01"
         }
-
-        let json: [String: Any]
-        do {
-            json = try await HTTP.send("POST", url: base.appendingPathComponent("messages"), headers: hdrs, body: body)
-        } catch AIError.http(400, let message) where useFallback && message.lowercased().contains("fallback") {
-            // Yedek model özelliği bu hesapta kullanılamıyorsa onsuz tekrar dene.
-            body.removeValue(forKey: "fallbacks")
-            json = try await HTTP.send("POST", url: base.appendingPathComponent("messages"), headers: headers(apiKey), body: body)
+        if Self.supportsEffort(model) {
+            body["output_config"] = ["effort": speed.effort]
         }
 
-        let content = json["content"] as? [[String: Any]] ?? []
-        let text = content
-            .filter { ($0["type"] as? String) == "text" }
-            .compactMap { $0["text"] as? String }
-            .joined()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            return try await run(body: body, headers: hdrs, onText: onText)
+        } catch AIError.http(400, let message) {
+            // Bu hesapta/modelde desteklenmeyen isteğe bağlı alanları çıkarıp bir kez daha dene.
+            let lower = message.lowercased()
+            var retried = false
+            if lower.contains("fallback") || lower.contains("beta") {
+                body.removeValue(forKey: "fallbacks")
+                hdrs.removeValue(forKey: "anthropic-beta")
+                retried = true
+            }
+            if lower.contains("effort") || lower.contains("output_config") {
+                body.removeValue(forKey: "output_config")
+                retried = true
+            }
+            guard retried else { throw AIError.http(400, message) }
+            return try await run(body: body, headers: hdrs, onText: onText)
+        }
+    }
 
-        if text.isEmpty {
-            if (json["stop_reason"] as? String) == "refusal" { throw AIError.refusal }
+    private func run(body: [String: Any], headers: [String: String],
+                     onText: @escaping @Sendable (String) async -> Void) async throws -> String {
+        var text = ""
+        var stopReason: String?
+        try await HTTP.streamEvents(url: base.appendingPathComponent("messages"), headers: headers, body: body) { event in
+            switch event["type"] as? String {
+            case "content_block_delta":
+                if let delta = event["delta"] as? [String: Any],
+                   (delta["type"] as? String) == "text_delta",
+                   let piece = delta["text"] as? String {
+                    text += piece
+                    await onText(text)
+                }
+            case "message_delta":
+                if let reason = (event["delta"] as? [String: Any])?["stop_reason"] as? String { stopReason = reason }
+            default:
+                break
+            }
+        }
+        let final = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if final.isEmpty {
+            if stopReason == "refusal" { throw AIError.refusal }
             throw AIError.empty
         }
-        return text
+        return final
     }
 
     func listModels(apiKey: String) async throws -> [String] {

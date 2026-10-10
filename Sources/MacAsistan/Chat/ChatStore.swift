@@ -75,6 +75,17 @@ final class ChatStore: ObservableObject {
         save()
     }
 
+    /// Akış sırasında bir mesajın metnini günceller (diske her parçada yazmaz).
+    func updateText(of messageID: UUID, in conversationID: UUID, to text: String, persist: Bool = false) {
+        guard let c = conversations.firstIndex(where: { $0.id == conversationID }),
+              let m = conversations[c].messages.firstIndex(where: { $0.id == messageID }) else { return }
+        conversations[c].messages[m].text = text
+        if persist {
+            conversations[c].updatedAt = Date()
+            save()
+        }
+    }
+
     func delete(_ id: UUID) {
         conversations.removeAll { $0.id == id }
         if selectedID == id { selectedID = conversations.first?.id }

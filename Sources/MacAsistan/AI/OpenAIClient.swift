@@ -10,20 +10,35 @@ struct OpenAIClient: AIClient {
         apiKey.isEmpty ? [:] : ["Authorization": "Bearer \(apiKey)"]
     }
 
-    func complete(system: String, turns: [ChatTurn], model: String, apiKey: String) async throws -> String {
+    func stream(system: String, turns: [ChatTurn], model: String, apiKey: String, speed: ResponseSpeed,
+                onText: @escaping @Sendable (String) async -> Void) async throws -> String {
         var messages: [[String: Any]] = [["role": "system", "content": system]]
         messages += turns.normalizedForAPI().map {
             ["role": $0.role == .user ? "user" : "assistant", "content": $0.text]
         }
-        let body: [String: Any] = ["model": model, "messages": messages]
-        let json = try await HTTP.send("POST", url: base.appendingPathComponent("chat/completions"), headers: headers(apiKey), body: body)
+        var body: [String: Any] = ["model": model, "messages": messages, "stream": true]
+        // Yalnızca OpenAI'ın akıl yürüten modellerinde (gpt-5, o-serisi) düşünme süresini ayarla.
+        let isReasoningModel = model.hasPrefix("gpt-5") || model.hasPrefix("o1") || model.hasPrefix("o3") || model.hasPrefix("o4")
+        if filterOpenAIModels && isReasoningModel {
+            body["reasoning_effort"] = speed.effort
+        }
 
-        guard let choices = json["choices"] as? [[String: Any]], let first = choices.first,
-              let message = first["message"] as? [String: Any] else { throw AIError.invalidResponse }
-        if let refusal = message["refusal"] as? String, !refusal.isEmpty { return refusal }
-        let text = (message["content"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty { throw AIError.empty }
-        return text
+        var text = ""
+        var refusal = ""
+        try await HTTP.streamEvents(url: base.appendingPathComponent("chat/completions"), headers: headers(apiKey), body: body) { event in
+            guard let choices = event["choices"] as? [[String: Any]], let delta = choices.first?["delta"] as? [String: Any] else { return }
+            if let piece = delta["content"] as? String, !piece.isEmpty {
+                text += piece
+                await onText(text)
+            }
+            if let piece = delta["refusal"] as? String { refusal += piece }
+        }
+        let final = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if final.isEmpty {
+            if !refusal.isEmpty { return refusal }
+            throw AIError.empty
+        }
+        return final
     }
 
     func listModels(apiKey: String) async throws -> [String] {

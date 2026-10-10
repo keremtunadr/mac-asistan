@@ -8,7 +8,8 @@ struct GeminiClient: AIClient {
         ["x-goog-api-key": apiKey]
     }
 
-    func complete(system: String, turns: [ChatTurn], model: String, apiKey: String) async throws -> String {
+    func stream(system: String, turns: [ChatTurn], model: String, apiKey: String, speed: ResponseSpeed,
+                onText: @escaping @Sendable (String) async -> Void) async throws -> String {
         let modelID = model.hasPrefix("models/") ? String(model.dropFirst("models/".count)) : model
         let contents: [[String: Any]] = turns.normalizedForAPI().map {
             ["role": $0.role == .user ? "user" : "model", "parts": [["text": $0.text]]]
@@ -17,24 +18,32 @@ struct GeminiClient: AIClient {
             "systemInstruction": ["parts": [["text": system]]],
             "contents": contents,
         ]
-        guard let url = URL(string: "\(base.absoluteString)/models/\(modelID):generateContent") else { throw AIError.invalidResponse }
-        let json = try await HTTP.send("POST", url: url, headers: headers(apiKey), body: body)
-
-        if let feedback = json["promptFeedback"] as? [String: Any], feedback["blockReason"] != nil {
-            throw AIError.refusal
+        guard let url = URL(string: "\(base.absoluteString)/models/\(modelID):streamGenerateContent?alt=sse") else {
+            throw AIError.invalidResponse
         }
-        let candidates = json["candidates"] as? [[String: Any]] ?? []
-        let parts = (candidates.first?["content"] as? [String: Any])?["parts"] as? [[String: Any]] ?? []
-        let text = parts
-            .filter { ($0["thought"] as? Bool) != true }
-            .compactMap { $0["text"] as? String }
-            .joined()
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty {
-            if (candidates.first?["finishReason"] as? String) == "SAFETY" { throw AIError.refusal }
+
+        var text = ""
+        var blocked = false
+        try await HTTP.streamEvents(url: url, headers: headers(apiKey), body: body) { event in
+            if let feedback = event["promptFeedback"] as? [String: Any], feedback["blockReason"] != nil { blocked = true }
+            let candidates = event["candidates"] as? [[String: Any]] ?? []
+            if (candidates.first?["finishReason"] as? String) == "SAFETY" { blocked = true }
+            let parts = (candidates.first?["content"] as? [String: Any])?["parts"] as? [[String: Any]] ?? []
+            let piece = parts
+                .filter { ($0["thought"] as? Bool) != true }
+                .compactMap { $0["text"] as? String }
+                .joined()
+            if !piece.isEmpty {
+                text += piece
+                await onText(text)
+            }
+        }
+        let final = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if final.isEmpty {
+            if blocked { throw AIError.refusal }
             throw AIError.empty
         }
-        return text
+        return final
     }
 
     func listModels(apiKey: String) async throws -> [String] {

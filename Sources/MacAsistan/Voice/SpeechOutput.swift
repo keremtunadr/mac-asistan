@@ -19,23 +19,51 @@ final class SpeechOutput: NSObject, ObservableObject {
         synthesizer.delegate = self
     }
 
-    func speak(_ rawText: String, fallbackLanguage: String) {
-        let text = Self.cleanForSpeech(rawText)
-        guard !text.isEmpty else { return }
-        if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
+    // Akış (streaming) durumu: cevap geldikçe tamamlanan cümleler sıraya eklenir.
+    private var streamActive = false
+    private var streamText = ""
+    private var consumed = 0
+    private var streamLanguage: String?
+    private var fallbackLanguage = "tr"
+    private var pendingUtterances = 0
 
-        let language = Self.detectLanguage(text) ?? fallbackLanguage
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = Self.voice(for: language)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        isSpeaking = true
-        onStart?(text)
-        synthesizer.speak(utterance)
+    /// Tek seferde bir metni okur.
+    func speak(_ rawText: String, fallbackLanguage: String) {
+        beginStream(fallbackLanguage: fallbackLanguage)
+        finishStream(rawText)
+    }
+
+    /// Yeni bir cevabın okunmasına hazırlan (önceki okuma durur).
+    func beginStream(fallbackLanguage: String) {
+        stop()
+        streamActive = true
+        streamText = ""
+        consumed = 0
+        streamLanguage = nil
+        self.fallbackLanguage = fallbackLanguage
+        pendingUtterances = 0
+    }
+
+    /// Cevabın o ana kadarki hâli: biten cümleler hemen okunmaya başlar.
+    func updateStream(_ text: String) {
+        guard streamActive else { return }
+        streamText = text
+        flush(final: false)
+    }
+
+    /// Cevap tamamlandı: kalan kısmı da oku.
+    func finishStream(_ text: String) {
+        guard streamActive else { return }
+        streamText = text
+        flush(final: true)
+        streamActive = false
+        if pendingUtterances <= 0 { finished() }
     }
 
     func stop() {
-        guard synthesizer.isSpeaking || isSpeaking else { return }
-        synthesizer.stopSpeaking(at: .immediate)
+        streamActive = false
+        pendingUtterances = 0
+        if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
         finished()
     }
 
@@ -43,6 +71,63 @@ final class SpeechOutput: NSObject, ObservableObject {
         guard isSpeaking else { return }
         isSpeaking = false
         onFinish?()
+    }
+
+    private func utteranceDone() {
+        pendingUtterances = max(0, pendingUtterances - 1)
+        if pendingUtterances == 0 && !streamActive { finished() }
+    }
+
+    private func flush(final: Bool) {
+        let all = Array(streamText)
+        guard consumed < all.count else { return }
+        var rest = String(all[consumed...])
+
+        // Kapanmamış bir kod bloğu varsa, bitene kadar onun öncesine kadar oku.
+        if !final {
+            let fences = rest.components(separatedBy: "```").count - 1
+            if fences % 2 == 1, let open = rest.range(of: "```", options: .backwards) {
+                rest = String(rest[..<open.lowerBound])
+            }
+        }
+
+        var chunk: String
+        if final {
+            chunk = rest
+        } else {
+            // Son tamamlanan cümlenin sonuna kadar al.
+            guard let regex = try? NSRegularExpression(pattern: "[.!?…:;](?=\\s)|\\n"),
+                  let last = regex.matches(in: rest, range: NSRange(rest.startIndex..., in: rest)).last,
+                  let range = Range(last.range, in: rest) else {
+                if rest.count > 280, let space = rest.range(of: " ", options: .backwards) {
+                    chunk = String(rest[..<space.upperBound])
+                } else {
+                    return
+                }
+                enqueue(chunk)
+                return
+            }
+            chunk = String(rest[..<range.upperBound])
+        }
+        enqueue(chunk)
+    }
+
+    private func enqueue(_ chunk: String) {
+        consumed += chunk.count
+        let text = Self.cleanForSpeech(chunk)
+        guard !text.isEmpty else { return }
+
+        if streamLanguage == nil {
+            let sample = Self.cleanForSpeech(streamText)
+            streamLanguage = Self.detectLanguage(sample.count > text.count ? sample : text) ?? fallbackLanguage
+        }
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = Self.voice(for: streamLanguage ?? fallbackLanguage)
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        pendingUtterances += 1
+        isSpeaking = true
+        onStart?(text)
+        synthesizer.speak(utterance)
     }
 
     // MARK: - Dil ve ses seçimi
@@ -117,10 +202,10 @@ final class SpeechOutput: NSObject, ObservableObject {
 
 extension SpeechOutput: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finished() }
+        Task { @MainActor in self.utteranceDone() }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finished() }
+        Task { @MainActor in self.utteranceDone() }
     }
 }

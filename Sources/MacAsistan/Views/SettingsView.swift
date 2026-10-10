@@ -106,6 +106,15 @@ private struct AITab: View {
                 } else {
                     Text(L10n.t(.modelHint)).font(.caption).foregroundStyle(.secondary)
                 }
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker(L10n.t(.speed), selection: Binding(get: { settings.responseSpeed }, set: { settings.responseSpeed = $0 })) {
+                        Text(L10n.t(.speedFast)).tag(ResponseSpeed.fast)
+                        Text(L10n.t(.speedBalanced)).tag(ResponseSpeed.balanced)
+                        Text(L10n.t(.speedDeep)).tag(ResponseSpeed.deep)
+                    }
+                    .pickerStyle(.segmented)
+                    Text(L10n.t(.speedHint)).font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             Section {

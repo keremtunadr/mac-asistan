@@ -279,13 +279,37 @@ final class AppState: ObservableObject {
             let key = key(for: provider)
             if key == nil && settings.requiresKey(provider) { continue }
             let model = settings.model(for: provider)
+            let messageID = UUID()
+            streaming = StreamingTarget(conversationID: conversationID, messageID: messageID, model: model)
+            if settings.readAloud { speechOut.beginStream(fallbackLanguage: settings.speechLanguage.languageCode) }
             do {
-                let answer = try await settings.client(for: provider).complete(system: system, turns: turns, model: model, apiKey: key ?? "")
+                let answer = try await settings.client(for: provider).stream(
+                    system: system, turns: turns, model: model, apiKey: key ?? "", speed: settings.responseSpeed
+                ) { [weak self] partial in
+                    await self?.receivePartial(partial, messageID: messageID)
+                }
                 cooldownUntil[provider] = nil
-                store.append(ChatMessage(role: .assistant, text: answer, model: model), to: conversationID)
-                if settings.readAloud { speak(answer) }
+                if streaming?.messageID == messageID && streaming?.created == true {
+                    store.updateText(of: messageID, in: conversationID, to: answer, persist: true)
+                } else {
+                    store.append(ChatMessage(id: messageID, role: .assistant, text: answer, model: model), to: conversationID)
+                }
+                if streaming?.messageID == messageID { streaming = nil }
+                if settings.readAloud { speechOut.finishStream(answer) }
                 return
             } catch {
+                let partialShown = streaming?.messageID == messageID && streaming?.created == true
+                if streaming?.messageID == messageID { streaming = nil }
+                if partialShown {
+                    // Cevabın bir kısmı geldi ama yarıda kesildi: geleni koru, hatayı altına yaz.
+                    let partialText = store.conversations.first { $0.id == conversationID }?
+                        .messages.first { $0.id == messageID }?.text ?? ""
+                    if settings.readAloud { speechOut.finishStream(partialText) }
+                    store.updateText(of: messageID, in: conversationID, to: partialText, persist: true)
+                    store.append(ChatMessage(role: .assistant, text: describe(error), isError: true, model: model), to: conversationID)
+                    return
+                }
+                speechOut.stop()
                 failures.append((provider, model, error))
                 let isLast = index == candidates.count - 1
                 if settings.autoSelect && Self.shouldTryNext(after: error) && !isLast {
@@ -303,6 +327,27 @@ final class AppState: ObservableObject {
             let text = L10n.t(.allProvidersFailed) + "\n\n" + lines.joined(separator: "\n\n")
             store.append(ChatMessage(role: .assistant, text: text, isError: true), to: conversationID)
         }
+    }
+
+    /// Şu an akışla gelen cevap.
+    private struct StreamingTarget {
+        let conversationID: UUID
+        let messageID: UUID
+        let model: String
+        var created = false
+    }
+    private var streaming: StreamingTarget?
+
+    private func receivePartial(_ text: String, messageID: UUID) {
+        guard var target = streaming, target.messageID == messageID else { return }
+        if target.created {
+            store.updateText(of: messageID, in: target.conversationID, to: text)
+        } else {
+            store.append(ChatMessage(id: messageID, role: .assistant, text: text, model: target.model), to: target.conversationID)
+            target.created = true
+            streaming = target
+        }
+        if settings.readAloud { speechOut.updateStream(text) }
     }
 
     private func describe(_ error: Error) -> String {

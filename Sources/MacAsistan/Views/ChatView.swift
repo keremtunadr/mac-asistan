@@ -118,7 +118,7 @@ private struct MessagesView: View {
                     ForEach(messages) { message in
                         MessageBubble(message: message).id(message.id)
                     }
-                    if app.isSending {
+                    if app.isSending && messages.last?.role != .assistant {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
                             Text(L10n.t(.thinking)).foregroundStyle(.secondary)
@@ -130,6 +130,9 @@ private struct MessagesView: View {
             }
             .onChange(of: messages.count) {
                 withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
+            }
+            .onChange(of: messages.last?.text.count ?? 0) {
+                if app.isSending { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
             }
             .onChange(of: app.isSending) {
                 if app.isSending { withAnimation { proxy.scrollTo("thinking", anchor: .bottom) } }

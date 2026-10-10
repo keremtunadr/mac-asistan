@@ -47,6 +47,7 @@ enum LKey: String {
     case untitledChat
     case otherAIs, otherAIsHint, addAI, customOpenAI, newAIName, name, baseURL, removeAI, removeAIConfirm, keyRequired, keyNotNeeded
     case showInDock
+    case speed, speedFast, speedBalanced, speedDeep, speedHint
     case automatic, autoSelect, autoSelectHint, allProvidersFailed, preferredProvider
     case testKey, testOK, keyFormatWarning, hintInvalidKey, hintModelNotFound, hintBilling
 }
@@ -178,6 +179,13 @@ enum L10n {
         .removeAIConfirm: ("Bu yapay zekâ ve anahtarı kaldırılsın mı?", "Diese KI und ihren Schlüssel entfernen?", "Remove this AI and its key?"),
         .keyRequired: ("API anahtarı gerekli", "API-Schlüssel erforderlich", "API key required"),
         .keyNotNeeded: ("Anahtar gerekmiyor", "Kein Schlüssel nötig", "No key needed"),
+        .speed: ("Cevap hızı", "Antworttempo", "Response speed"),
+        .speedFast: ("Hızlı", "Schnell", "Fast"),
+        .speedBalanced: ("Dengeli", "Ausgewogen", "Balanced"),
+        .speedDeep: ("Derin düşün", "Gründlich", "Thorough"),
+        .speedHint: ("Hızlı: günlük sohbet ve sesli kullanım için. Derin düşün: zor sorular için, daha yavaş ve daha pahalı. Daha da hız için daha küçük bir model seç (ör. claude-haiku-5-5).",
+                     "Schnell: für Alltag und Sprachbedienung. Gründlich: für schwierige Fragen, langsamer und teurer. Noch schneller: ein kleineres Modell wählen (z. B. claude-haiku-5-5).",
+                     "Fast: for everyday chat and voice. Thorough: for hard questions, slower and more expensive. For even more speed pick a smaller model (e.g. claude-haiku-5-5)."),
         .showInDock: ("Dock'ta göster", "Im Dock anzeigen", "Show in Dock"),
         .automatic: ("Otomatik", "Automatisch", "Automatic"),
         .autoSelect: ("Sağlayıcıyı otomatik seç", "Anbieter automatisch wählen", "Choose provider automatically"),

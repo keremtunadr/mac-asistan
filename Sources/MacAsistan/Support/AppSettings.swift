@@ -54,6 +54,9 @@ final class AppSettings: ObservableObject {
     @Published var autoSelect: Bool {
         didSet { defaults.set(autoSelect, forKey: "autoSelect") }
     }
+    @Published var responseSpeed: ResponseSpeed {
+        didSet { defaults.set(responseSpeed.rawValue, forKey: "responseSpeed") }
+    }
     @Published var anthropicModel: String {
         didSet { defaults.set(anthropicModel, forKey: "model.anthropic") }
     }
@@ -96,6 +99,7 @@ final class AppSettings: ObservableObject {
         if case let .custom(id) = savedProvider, !savedCustom.contains(where: { $0.id == id }) { savedProvider = .builtin(.anthropic) }
         provider = savedProvider
         autoSelect = defaults.object(forKey: "autoSelect") as? Bool ?? true
+        responseSpeed = ResponseSpeed(rawValue: defaults.string(forKey: "responseSpeed") ?? "") ?? .fast
         anthropicModel = defaults.string(forKey: "model.anthropic") ?? AIProviderKind.anthropic.defaultModel
         openAIModel = defaults.string(forKey: "model.openai") ?? AIProviderKind.openai.defaultModel
         geminiModel = defaults.string(forKey: "model.gemini") ?? AIProviderKind.gemini.defaultModel

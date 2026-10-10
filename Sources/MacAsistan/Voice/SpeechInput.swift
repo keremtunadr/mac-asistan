@@ -129,8 +129,8 @@ final class SpeechInput: ObservableObject {
 
     /// Asistan konuşmaya başladı: kullanıcının araya girmesini dinle.
     func speakingStarted(text: String) {
-        spokenWords = Self.words(in: text)
-        guard hasPermissions, mode != .command else { return }
+        spokenWords.formUnion(Self.words(in: text))
+        guard hasPermissions, mode != .command, mode != .bargeIn else { return }
         begin(.bargeIn)
     }
 

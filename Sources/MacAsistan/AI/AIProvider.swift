@@ -73,8 +73,23 @@ struct ChatTurn {
     let text: String
 }
 
+/// Cevap hızı: modelin ne kadar "düşüneceği". Sohbet için hızlı genelde yeterlidir.
+enum ResponseSpeed: String, CaseIterable, Identifiable {
+    case fast, balanced, deep
+    var id: String { rawValue }
+    var effort: String {
+        switch self {
+        case .fast: return "low"
+        case .balanced: return "medium"
+        case .deep: return "high"
+        }
+    }
+}
+
 protocol AIClient {
-    func complete(system: String, turns: [ChatTurn], model: String, apiKey: String) async throws -> String
+    /// Cevabı akış hâlinde üretir; `onText` o ana kadar gelen metnin tamamıyla çağrılır. Son metni döndürür.
+    func stream(system: String, turns: [ChatTurn], model: String, apiKey: String, speed: ResponseSpeed,
+                onText: @escaping @Sendable (String) async -> Void) async throws -> String
     func listModels(apiKey: String) async throws -> [String]
 }
 
@@ -113,6 +128,41 @@ enum HTTP {
         }
         guard let json else { throw AIError.invalidResponse }
         return json
+    }
+
+    /// Server-Sent Events: her "data:" satırı JSON olarak `onEvent`e verilir.
+    static func streamEvents(url: URL, headers: [String: String], body: [String: Any],
+                             onEvent: ([String: Any]) async throws -> Void) async throws {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 300
+        for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else { throw AIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            var data = Data()
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count > 200_000 { break }
+            }
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            throw AIError.http(http.statusCode, errorMessage(json) ?? String(decoding: data.prefix(500), as: UTF8.self))
+        }
+        for try await line in bytes.lines {
+            guard line.hasPrefix("data:") else { continue }
+            let payload = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            if payload == "[DONE]" { break }
+            guard let data = payload.data(using: .utf8),
+                  let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { continue }
+            if let error = json["error"] as? [String: Any] {
+                throw AIError.http(503, error["message"] as? String ?? "stream error")
+            }
+            try await onEvent(json)
+        }
     }
 
     private static func errorMessage(_ json: [String: Any]?) -> String? {
