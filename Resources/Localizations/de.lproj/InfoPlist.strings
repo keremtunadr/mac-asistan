@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "Mac Asistan";
+"NSMicrophoneUsageDescription" = "Mac Asistan verwendet das Mikrofon, um deine Sprachbefehle zu hören.";
+"NSSpeechRecognitionUsageDescription" = "Mac Asistan verwendet die Spracherkennung, um Gesprochenes in Text umzuwandeln.";

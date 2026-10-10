@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "Mac Asistan";
+"NSMicrophoneUsageDescription" = "Mac Asistan uses the microphone to hear your voice commands.";
+"NSSpeechRecognitionUsageDescription" = "Mac Asistan uses speech recognition to turn what you say into text.";

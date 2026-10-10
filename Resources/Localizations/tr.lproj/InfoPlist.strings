@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "Mac Asistan";
+"NSMicrophoneUsageDescription" = "Mac Asistan, sesli komutlarını duyabilmek için mikrofonu kullanır.";
+"NSSpeechRecognitionUsageDescription" = "Mac Asistan, söylediklerini yazıya çevirmek için konuşma tanımayı kullanır.";
