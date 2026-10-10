@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct MacAsistanApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var app = AppState.shared
 
     var body: some Scene {
@@ -49,6 +50,15 @@ struct MenuBarLabel: View {
         case .command: return "waveform.circle.fill"
         case .wake, .bargeIn: return "ear"
         case .off: return app.isSending ? "ellipsis.bubble" : "sparkles"
+        }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Menü çubuğu simgesi başlatmayı tetiklemezse diye yedek.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            MainActor.assumeIsolated { AppState.shared.start() }
         }
     }
 }

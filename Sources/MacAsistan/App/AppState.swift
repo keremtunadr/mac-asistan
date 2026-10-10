@@ -18,7 +18,15 @@ final class AppState: ObservableObject {
     @Published private(set) var isSending = false
 
     /// SwiftUI pencerelerini kod içinden açabilmek için (menü çubuğu görünümü tarafından atanır).
-    var openWindowAction: OpenWindowAction?
+    var openWindowAction: OpenWindowAction? {
+        didSet {
+            if let id = pendingWindow, openWindowAction != nil {
+                pendingWindow = nil
+                openWindow(id)
+            }
+        }
+    }
+    private var pendingWindow: String?
 
     private var cancellables: Set<AnyCancellable> = []
     private var didStart = false
@@ -105,7 +113,11 @@ final class AppState: ObservableObject {
 
     func openWindow(_ id: String) {
         NSApp.activate(ignoringOtherApps: true)
-        openWindowAction?(id: id)
+        if let action = openWindowAction {
+            action(id: id)
+        } else {
+            pendingWindow = id
+        }
     }
 
     // MARK: - Ses
