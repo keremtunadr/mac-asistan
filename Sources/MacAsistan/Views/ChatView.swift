@@ -21,9 +21,11 @@ struct ChatView: View {
         .navigationTitle(app.store.selected?.title ?? L10n.t(.appName))
         .toolbar {
             ToolbarItem {
-                Picker(L10n.t(.provider), selection: Binding(get: { app.settings.provider }, set: { app.settings.provider = $0 })) {
+                Picker(L10n.t(.provider), selection: Binding(get: { app.settings.providerSelection }, set: { app.settings.providerSelection = $0 })) {
+                    Text("✨ \(L10n.t(.automatic))").tag("auto")
+                    Divider()
                     ForEach(AIProviderKind.allCases) { kind in
-                        Text("\(kind.displayName) · \(app.settings.model(for: kind))").tag(kind)
+                        Text("\(kind.displayName) · \(app.settings.model(for: kind))").tag(kind.rawValue)
                     }
                 }
                 .help(L10n.t(.provider))

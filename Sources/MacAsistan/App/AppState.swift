@@ -55,7 +55,35 @@ final class AppState: ObservableObject {
         return apiKeys[kind]
     }
 
-    var hasKeyForCurrentProvider: Bool { apiKeys[settings.provider] != nil }
+    var hasKeyForCurrentProvider: Bool {
+        settings.autoSelect ? !apiKeys.isEmpty : apiKeys[settings.provider] != nil
+    }
+
+    /// Yakın zamanda başarısız olan sağlayıcılar bu zamana kadar atlanır (otomatik modda).
+    private var cooldownUntil: [AIProviderKind: Date] = [:]
+    private static let cooldown: TimeInterval = 10 * 60
+
+    /// Bu hata başka bir sağlayıcıyı denemeye değer mi? (anahtar, kredi, model, sunucu, ağ)
+    private static func shouldTryNext(after error: Error) -> Bool {
+        switch error {
+        case let AIError.http(code, _): return [401, 402, 403, 404, 408, 429].contains(code) || code >= 500
+        case AIError.invalidResponse, AIError.empty: return true
+        case is URLError: return true
+        default: return false
+        }
+    }
+
+    /// Denenecek sağlayıcılar, sırasıyla.
+    private func providerCandidates() -> [AIProviderKind] {
+        let preferred = settings.provider
+        guard settings.autoSelect else { return [preferred] }
+        let ordered = [preferred] + AIProviderKind.allCases.filter { $0 != preferred }
+        let withKeys = ordered.filter { key(for: $0) != nil }
+        let now = Date()
+        let ready = withKeys.filter { (cooldownUntil[$0] ?? .distantPast) <= now }
+        // Hepsi beklemedeyse yine de hepsini dene.
+        return ready.isEmpty ? withKeys : ready
+    }
 
     // MARK: - Başlangıç
 
@@ -202,9 +230,9 @@ final class AppState: ObservableObject {
         let conversationID = store.ensureSelected()
         store.append(ChatMessage(role: .user, text: text, viaVoice: viaVoice), to: conversationID)
 
-        let provider = settings.provider
-        let model = settings.model(for: provider)
-        guard let key = key(for: provider) else {
+        let candidates = providerCandidates()
+        guard !candidates.isEmpty, key(for: candidates[0]) != nil else {
+            let provider = settings.provider
             store.append(ChatMessage(role: .assistant, text: "\(L10n.t(.noApiKey)): \(provider.displayName). \(L10n.t(.noApiKeyHint))", isError: true), to: conversationID)
             openWindow("settings")
             return
@@ -217,14 +245,35 @@ final class AppState: ObservableObject {
         isSending = true
         defer { isSending = false }
 
-        do {
-            let answer = try await provider.makeClient().complete(
-                system: systemPrompt(viaVoice: viaVoice), turns: turns, model: model, apiKey: key
-            )
-            store.append(ChatMessage(role: .assistant, text: answer, model: model), to: conversationID)
-            if settings.readAloud { speak(answer) }
-        } catch {
-            store.append(ChatMessage(role: .assistant, text: describe(error), isError: true, model: model), to: conversationID)
+        let system = systemPrompt(viaVoice: viaVoice)
+        var failures: [(AIProviderKind, String, Error)] = []
+
+        for (index, provider) in candidates.enumerated() {
+            guard let key = key(for: provider) else { continue }
+            let model = settings.model(for: provider)
+            do {
+                let answer = try await provider.makeClient().complete(system: system, turns: turns, model: model, apiKey: key)
+                cooldownUntil[provider] = nil
+                store.append(ChatMessage(role: .assistant, text: answer, model: model), to: conversationID)
+                if settings.readAloud { speak(answer) }
+                return
+            } catch {
+                failures.append((provider, model, error))
+                let isLast = index == candidates.count - 1
+                if settings.autoSelect && Self.shouldTryNext(after: error) && !isLast {
+                    cooldownUntil[provider] = Date().addingTimeInterval(Self.cooldown)
+                    continue
+                }
+                break
+            }
+        }
+
+        if failures.count == 1, let failure = failures.first {
+            store.append(ChatMessage(role: .assistant, text: describe(failure.2), isError: true, model: failure.1), to: conversationID)
+        } else {
+            let lines = failures.map { "• \($0.0.displayName) (\($0.1)): \(describe($0.2))" }
+            let text = L10n.t(.allProvidersFailed) + "\n\n" + lines.joined(separator: "\n\n")
+            store.append(ChatMessage(role: .assistant, text: text, isError: true), to: conversationID)
         }
     }
 

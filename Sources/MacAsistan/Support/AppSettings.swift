@@ -42,6 +42,10 @@ final class AppSettings: ObservableObject {
     @Published var provider: AIProviderKind {
         didSet { defaults.set(provider.rawValue, forKey: "provider") }
     }
+    /// Açıkken önce `provider` denenir; çalışmazsa anahtarı olan diğer sağlayıcılara geçilir.
+    @Published var autoSelect: Bool {
+        didSet { defaults.set(autoSelect, forKey: "autoSelect") }
+    }
     @Published var anthropicModel: String {
         didSet { defaults.set(anthropicModel, forKey: "model.anthropic") }
     }
@@ -73,6 +77,7 @@ final class AppSettings: ObservableObject {
     private init() {
         uiLanguage = AppLanguage(rawValue: defaults.string(forKey: "uiLanguage") ?? "") ?? .tr
         provider = AIProviderKind(rawValue: defaults.string(forKey: "provider") ?? "") ?? .anthropic
+        autoSelect = defaults.object(forKey: "autoSelect") as? Bool ?? true
         anthropicModel = defaults.string(forKey: "model.anthropic") ?? AIProviderKind.anthropic.defaultModel
         openAIModel = defaults.string(forKey: "model.openai") ?? AIProviderKind.openai.defaultModel
         geminiModel = defaults.string(forKey: "model.gemini") ?? AIProviderKind.gemini.defaultModel
@@ -106,4 +111,17 @@ final class AppSettings: ObservableObject {
     }
 
     var currentModel: String { model(for: provider) }
+
+    /// Sohbet/menü seçicileri için: "auto" veya sağlayıcı kodu.
+    var providerSelection: String {
+        get { autoSelect ? "auto" : provider.rawValue }
+        set {
+            if newValue == "auto" {
+                autoSelect = true
+            } else if let kind = AIProviderKind(rawValue: newValue) {
+                autoSelect = false
+                provider = kind
+            }
+        }
+    }
 }

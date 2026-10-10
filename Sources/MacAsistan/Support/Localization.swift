@@ -45,6 +45,7 @@ enum LKey: String {
     case errorPrefix, refusal, emptyAnswer, voiceMessage
     case emptyChatTitle, emptyChatText
     case untitledChat
+    case automatic, autoSelect, autoSelectHint, allProvidersFailed, preferredProvider
     case testKey, testOK, keyFormatWarning, hintInvalidKey, hintModelNotFound, hintBilling
 }
 
@@ -162,6 +163,13 @@ enum L10n {
                          "Schreib oder tippe aufs Mikrofon. Du kannst Türkisch, Deutsch oder Englisch sprechen.",
                          "Type or tap the microphone. You can speak Turkish, German or English."),
         .untitledChat: ("Yeni sohbet", "Neuer Chat", "New chat"),
+        .automatic: ("Otomatik", "Automatisch", "Automatic"),
+        .autoSelect: ("Sağlayıcıyı otomatik seç", "Anbieter automatisch wählen", "Choose provider automatically"),
+        .autoSelectHint: ("Önce tercih ettiğin sağlayıcı denenir. Anahtarı, kredisi veya modeli çalışmazsa ya da sunucu cevap vermezse anahtarı kayıtlı diğer sağlayıcıya geçilir.",
+                          "Zuerst wird dein bevorzugter Anbieter genutzt. Funktionieren Schlüssel, Guthaben oder Modell nicht oder antwortet der Server nicht, wird ein anderer Anbieter mit gespeichertem Schlüssel verwendet.",
+                          "Your preferred provider is tried first. If its key, credit or model doesn't work or the server doesn't respond, another provider with a saved key is used."),
+        .allProvidersFailed: ("Hiçbir sağlayıcı cevap veremedi:", "Kein Anbieter konnte antworten:", "No provider could answer:"),
+        .preferredProvider: ("Tercih edilen sağlayıcı", "Bevorzugter Anbieter", "Preferred provider"),
         .testKey: ("Test et", "Testen", "Test"),
         .testOK: ("Anahtar çalışıyor ✓", "Schlüssel funktioniert ✓", "Key works ✓"),
         .keyFormatWarning: ("Bu bir %@ anahtarına benzemiyor. Gerçek anahtar \"%@\" ile başlar. Anahtarın kimliğini (ID) değil, oluşturulurken bir kez gösterilen anahtarın tamamını kopyala.",

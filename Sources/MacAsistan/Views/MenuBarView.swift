@@ -71,13 +71,17 @@ struct MenuBarView: View {
             // Sağlayıcı ve model
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.t(.provider)).font(.caption).foregroundStyle(.secondary)
-                Picker("", selection: Binding(get: { settings.provider }, set: { settings.provider = $0 })) {
+                Picker("", selection: Binding(get: { settings.providerSelection }, set: { settings.providerSelection = $0 })) {
+                    Text("✨ \(L10n.t(.automatic))").tag("auto")
+                    Divider()
                     ForEach(AIProviderKind.allCases) { kind in
-                        Text(kind.displayName).tag(kind)
+                        Text(kind.displayName).tag(kind.rawValue)
                     }
                 }
                 .labelsHidden()
-                Text("\(L10n.t(.model)): \(settings.currentModel)")
+                Text(settings.autoSelect
+                     ? "\(L10n.t(.preferredProvider)): \(settings.provider.displayName) · \(settings.currentModel)"
+                     : "\(L10n.t(.model)): \(settings.currentModel)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !app.hasKeyForCurrentProvider {

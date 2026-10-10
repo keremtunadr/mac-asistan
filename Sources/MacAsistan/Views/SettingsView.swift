@@ -74,7 +74,12 @@ private struct AITab: View {
             }
 
             Section {
-                Picker(L10n.t(.provider), selection: Binding(get: { settings.provider }, set: { settings.provider = $0 })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle(L10n.t(.autoSelect), isOn: Binding(get: { settings.autoSelect }, set: { settings.autoSelect = $0 }))
+                    Text(L10n.t(.autoSelectHint)).font(.caption).foregroundStyle(.secondary)
+                }
+                Picker(settings.autoSelect ? L10n.t(.preferredProvider) : L10n.t(.provider),
+                       selection: Binding(get: { settings.provider }, set: { settings.provider = $0 })) {
                     ForEach(AIProviderKind.allCases) { Text($0.displayName).tag($0) }
                 }
                 HStack {
