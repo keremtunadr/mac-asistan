@@ -43,6 +43,7 @@ private struct GeneralTab: View {
                 ForEach(AppLanguage.allCases) { Text($0.displayName).tag($0) }
             }
             Toggle(L10n.t(.readAloud), isOn: Binding(get: { settings.readAloud }, set: { settings.readAloud = $0 }))
+            Toggle(L10n.t(.showInDock), isOn: Binding(get: { settings.showInDock }, set: { settings.showInDock = $0 }))
             VStack(alignment: .leading, spacing: 2) {
                 Toggle(L10n.t(.hotkey), isOn: Binding(get: { settings.hotkeyEnabled }, set: { settings.hotkeyEnabled = $0 }))
                 Text(L10n.t(.hotkeyHint)).font(.caption).foregroundStyle(.secondary)

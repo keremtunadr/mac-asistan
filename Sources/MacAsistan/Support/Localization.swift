@@ -46,6 +46,7 @@ enum LKey: String {
     case emptyChatTitle, emptyChatText
     case untitledChat
     case otherAIs, otherAIsHint, addAI, customOpenAI, newAIName, name, baseURL, removeAI, removeAIConfirm, keyRequired, keyNotNeeded
+    case showInDock
     case automatic, autoSelect, autoSelectHint, allProvidersFailed, preferredProvider
     case testKey, testOK, keyFormatWarning, hintInvalidKey, hintModelNotFound, hintBilling
 }
@@ -177,6 +178,7 @@ enum L10n {
         .removeAIConfirm: ("Bu yapay zekâ ve anahtarı kaldırılsın mı?", "Diese KI und ihren Schlüssel entfernen?", "Remove this AI and its key?"),
         .keyRequired: ("API anahtarı gerekli", "API-Schlüssel erforderlich", "API key required"),
         .keyNotNeeded: ("Anahtar gerekmiyor", "Kein Schlüssel nötig", "No key needed"),
+        .showInDock: ("Dock'ta göster", "Im Dock anzeigen", "Show in Dock"),
         .automatic: ("Otomatik", "Automatisch", "Automatic"),
         .autoSelect: ("Sağlayıcıyı otomatik seç", "Anbieter automatisch wählen", "Choose provider automatically"),
         .autoSelectHint: ("Önce tercih ettiğin sağlayıcı denenir. Anahtarı, kredisi veya modeli çalışmazsa ya da sunucu cevap vermezse anahtarı kayıtlı diğer sağlayıcıya geçilir.",

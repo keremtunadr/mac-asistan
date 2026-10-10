@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Konuşma tanıma dili.
@@ -77,6 +78,12 @@ final class AppSettings: ObservableObject {
     @Published var silenceSeconds: Double {
         didSet { defaults.set(silenceSeconds, forKey: "silenceSeconds") }
     }
+    @Published var showInDock: Bool {
+        didSet {
+            defaults.set(showInDock, forKey: "showInDock")
+            NSApp.setActivationPolicy(showInDock ? .regular : .accessory)
+        }
+    }
     @Published var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding") }
     }
@@ -98,6 +105,7 @@ final class AppSettings: ObservableObject {
         hotkeyEnabled = defaults.object(forKey: "hotkeyEnabled") as? Bool ?? true
         silenceSeconds = defaults.object(forKey: "silenceSeconds") as? Double ?? 1.5
         hasCompletedOnboarding = defaults.bool(forKey: "hasCompletedOnboarding")
+        showInDock = defaults.object(forKey: "showInDock") as? Bool ?? true
 
         for kind in AIProviderKind.allCases where kind.retiredDefaults.contains(model(for: kind)) {
             setModel(kind.defaultModel, for: kind)

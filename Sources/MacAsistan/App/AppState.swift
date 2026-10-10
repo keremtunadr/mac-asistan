@@ -102,11 +102,13 @@ final class AppState: ObservableObject {
         if settings.hotkeyEnabled { registerHotKey() }
         if settings.wakeWordEnabled { speechIn.setWakeEnabled(true) }
 
-        if !settings.hasCompletedOnboarding || apiKeys.isEmpty {
-            openWindow("settings")
-        } else {
-            openWindow("chat")
-        }
+        showMainWindow()
+    }
+
+    /// İlk kurulumda Ayarlar'ı, sonra sohbet penceresini öne getirir.
+    func showMainWindow() {
+        let needsSetup = !settings.hasCompletedOnboarding || !hasKeyForCurrentProvider
+        openWindow(needsSetup ? "settings" : "chat")
     }
 
     private func wire() {
@@ -163,8 +165,17 @@ final class AppState: ObservableObject {
 
     func openWindow(_ id: String) {
         NSApp.activate(ignoringOtherApps: true)
+        // Pencere zaten varsa (gizli/küçültülmüş) doğrudan öne getir.
+        let existing = NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(id) == true }
+        if let window = existing, window.isVisible || window.isMiniaturized {
+            window.deminiaturize(nil)
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
         if let action = openWindowAction {
             action(id: id)
+        } else if let window = existing {
+            window.makeKeyAndOrderFront(nil)
         } else {
             pendingWindow = id
         }
